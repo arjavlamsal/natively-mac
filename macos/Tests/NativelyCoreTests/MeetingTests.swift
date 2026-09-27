@@ -1,0 +1,67 @@
+import Testing
+import Foundation
+@testable import NativelyCore
+
+@Suite("NativelyCore Models Tests")
+struct MeetingTests {
+    @Test("Meeting and DetailedSummary JSON serialization roundtrip")
+    func testMeetingSerialization() throws {
+        let actionItem = ActionItem(id: "item-1", text: "Ship native macOS app", owner: "Team", deadline: "2026-10-01")
+        let summary = DetailedSummary(
+            overview: "Architecture transformation meeting",
+            actionItems: ["Ship native macOS app"],
+            actionItemsV3: [actionItem],
+            keyPoints: ["Electron is bulky", "Swift 6 is blazing fast"],
+            tldr: ["Transforming to native macOS app"]
+        )
+
+        let summaryData = try JSONEncoder().encode(summary)
+        let summaryJson = String(data: summaryData, encoding: .utf8)
+
+        let meeting = Meeting(
+            id: "meeting-123",
+            title: "Native Architecture Alignment",
+            startTime: 1774742400000,
+            durationMs: 3600000,
+            summaryJson: summaryJson,
+            source: "manual",
+            isProcessed: true,
+            summaryStatus: "completed"
+        )
+
+        #expect(meeting.id == "meeting-123")
+        #expect(meeting.title == "Native Architecture Alignment")
+        #expect(meeting.isProcessed == true)
+
+        let parsed = meeting.parsedSummary
+        #expect(parsed != nil)
+        #expect(parsed?.overview == "Architecture transformation meeting")
+        #expect(parsed?.actionItemsV3?.first?.text == "Ship native macOS app")
+        #expect(parsed?.actionItemsV3?.first?.owner == "Team")
+    }
+
+    @Test("TranscriptTurn model initialization")
+    func testTranscriptTurn() {
+        let turn = TranscriptTurn(
+            id: 1,
+            meetingId: "meeting-123",
+            speaker: "Interviewer",
+            content: "What are the advantages of Swift over Electron?",
+            timestampMs: 12000
+        )
+
+        #expect(turn.meetingId == "meeting-123")
+        #expect(turn.speaker == "Interviewer")
+        #expect(turn.content == "What are the advantages of Swift over Electron?")
+        #expect(turn.timestampMs == 12000)
+    }
+
+    @Test("AppSettings default values")
+    func testAppSettings() {
+        let settings = AppSettings()
+        #expect(settings.selectedSTTEngine == .whisperKit)
+        #expect(settings.isStealthModeEnabled == true)
+        #expect(settings.isAdaptiveDockEnabled == true)
+        #expect(settings.selectedAIProvider == .anthropic)
+    }
+}
