@@ -12,16 +12,18 @@ const { build, context } = require('esbuild');
 // TS7-legal setting) — and tsc has not been the emitter for dist-electron for a
 // long time anyway. Type-checking in watch mode is `tsc --noEmit --watch`.
 const WATCH = process.argv.includes('--watch');
-// Fork pull requests cannot receive the repository secret needed to fetch the
-// private premium submodule. This opt-in mode still bundles every core Electron
-// entrypoint, but leaves private runtime imports unresolved for the packaged
-// premium build to supply. Normal development and release builds are unchanged.
-const CORE_SMOKE = process.env.NATIVELY_CORE_SMOKE === '1';
 const path = require('path');
 const fs = require('fs');
 
 const rootDir = path.resolve(__dirname, '..');
 const outDir = path.resolve(rootDir, 'dist-electron');
+const premiumDir = path.resolve(rootDir, 'premium/electron');
+
+// Fork pull requests cannot receive the repository secret needed to fetch the
+// private premium submodule. This mode still bundles every core Electron
+// entrypoint, but leaves private runtime imports unresolved for the packaged
+// premium build to supply. Normal development and release builds are unchanged.
+const CORE_SMOKE = process.env.NATIVELY_CORE_SMOKE === '1' || !fs.existsSync(premiumDir);
 
 const entryPoints = [];
 
@@ -42,7 +44,6 @@ if (fs.existsSync(electronDir)) {
 }
 
 // Also include premium electron files if they exist
-const premiumDir = path.resolve(rootDir, 'premium/electron');
 if (fs.existsSync(premiumDir)) {
   entryPoints.push(...findTs(premiumDir).map(f => path.relative(rootDir, f)));
 }

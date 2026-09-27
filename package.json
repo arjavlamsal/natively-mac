@@ -397,5 +397,11 @@
       "react": "$react"
     }
   },
-  "nativelySigned": true
+  "nativelySigned": true,
+  "trustedDependencies": [
+    "core-js",
+    "node-llama-cpp",
+    "onnxruntime-node",
+    "protobufjs"
+  ]
 }
