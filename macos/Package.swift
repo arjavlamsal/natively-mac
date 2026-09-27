@@ -10,9 +10,11 @@ let package = Package(
         .library(name: "NativelyCore", targets: ["NativelyCore"]),
         .library(name: "NativelySecurity", targets: ["NativelySecurity"]),
         .library(name: "NativelyDatabase", targets: ["NativelyDatabase"]),
+        .library(name: "NativelyAudio", targets: ["NativelyAudio"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0")
+        .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.14.0")
     ],
     targets: [
         .target(
@@ -33,6 +35,15 @@ let package = Package(
             ],
             path: "Sources/NativelyDatabase"
         ),
+        .target(
+            name: "NativelyAudio",
+            dependencies: [
+                "NativelyCore",
+                "NativelyDatabase",
+                .product(name: "WhisperKit", package: "WhisperKit")
+            ],
+            path: "Sources/NativelyAudio"
+        ),
         .testTarget(
             name: "NativelyCoreTests",
             dependencies: ["NativelyCore"],
@@ -47,6 +58,11 @@ let package = Package(
             name: "NativelyDatabaseTests",
             dependencies: ["NativelyDatabase"],
             path: "Tests/NativelyDatabaseTests"
+        ),
+        .testTarget(
+            name: "NativelyAudioTests",
+            dependencies: ["NativelyAudio"],
+            path: "Tests/NativelyAudioTests"
         )
     ]
 )
