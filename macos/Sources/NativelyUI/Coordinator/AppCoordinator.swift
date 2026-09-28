@@ -24,6 +24,7 @@ public final class AppCoordinator: ObservableObject {
     public let permissionsManager: PermissionsManager
     public let hotkeyManager: HotkeyManager
     public let screenVisionCoordinator: ScreenVisionCoordinator
+    public let audioCoordinator: DualChannelAudioCoordinator
     public let ragRetriever: RAGRetriever
     public let turnPlanner: TurnPlannerActor
     
@@ -46,6 +47,7 @@ public final class AppCoordinator: ObservableObject {
         self.permissionsManager = PermissionsManager.shared
         self.hotkeyManager = HotkeyManager.shared
         self.screenVisionCoordinator = ScreenVisionCoordinator()
+        self.audioCoordinator = DualChannelAudioCoordinator(database: database)
         self.ragRetriever = RAGRetriever(database: database)
         self.turnPlanner = TurnPlannerActor(database: database)
     }
@@ -72,6 +74,16 @@ public final class AppCoordinator: ObservableObject {
         
         // 6. Check System Permissions
         permissionsManager.checkAllPermissions()
+        
+        // 7. Setup Audio Turn Handler
+        Task { [weak self] in
+            guard let self else { return }
+            await self.audioCoordinator.setTurnHandler { [weak self] turn in
+                Task { @MainActor in
+                    self?.overlayWindowManager.viewModel.appendTranscript(speaker: turn.speaker, text: turn.content)
+                }
+            }
+        }
     }
     
     /// Shuts down all active servers, monitors, and session engines.
@@ -80,6 +92,9 @@ public final class AppCoordinator: ObservableObject {
         hotkeyManager.unregisterAll()
         overlayWindowManager.hideOverlay()
         launcherWindowManager.hideLauncher()
+        Task { [weak self] in
+            await self?.audioCoordinator.stopMeeting()
+        }
     }
     
     // MARK: - Companion Server Hookup
@@ -183,10 +198,16 @@ public final class AppCoordinator: ObservableObject {
         
         overlayWindowManager.viewModel.currentMeetingId = meetingId
         menuBarController.setMeetingState(isActive: true, title: title)
+        
+        Task { [weak self] in
+            try? await self?.audioCoordinator.startMeeting(id: meetingId)
+        }
     }
     
     public func stopMeetingSession() async -> Meeting? {
         guard isMeetingActive, var meeting = activeMeeting else { return nil }
+        
+        await audioCoordinator.stopMeeting()
         
         let durationMs: Int64
         if let startTime = meetingStartTime {
@@ -204,6 +225,24 @@ public final class AppCoordinator: ObservableObject {
         
         overlayWindowManager.viewModel.currentMeetingId = nil
         menuBarController.setMeetingState(isActive: false)
+        
+        // Auto-index meeting transcripts into semantic vector chunks for RAG
+        let turns = (try? database.fetchTranscripts(for: meeting.id)) ?? []
+        if !turns.isEmpty {
+            let chunks = SemanticChunker.chunkTranscripts(turns)
+            var vectorChunks: [VectorChunk] = []
+            for (idx, chunk) in chunks.enumerated() {
+                vectorChunks.append(VectorChunk(
+                    id: "\(meeting.id)-c\(idx)",
+                    meetingId: meeting.id,
+                    chunkIndex: idx,
+                    text: chunk.text,
+                    embedding: nil,
+                    timestampMs: Int64(idx * 2000)
+                ))
+            }
+            try? database.saveVectorChunks(vectorChunks)
+        }
         
         // Refresh launcher list
         launcherWindowManager.viewModel.loadMeetings()

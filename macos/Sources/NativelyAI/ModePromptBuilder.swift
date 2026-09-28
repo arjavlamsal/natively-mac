@@ -15,8 +15,11 @@ public struct ModePromptBuilder: Sendable {
     ) -> String {
         var basePrompt = ""
         
-        switch modeId.lowercased() {
-        case "technical", "coding", "interview":
+        if let custom = customPrompt, !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            basePrompt = custom
+        } else {
+            switch modeId.lowercased() {
+            case "technical", "coding", "interview":
             basePrompt = """
             You are Natively, an elite real-time technical interview copilot.
             Your output will be read at a glance during a live coding interview.
@@ -67,10 +70,11 @@ public struct ModePromptBuilder: Sendable {
             """
             
         default:
-            basePrompt = customPrompt ?? """
+            basePrompt = """
             You are Natively, a modern native macOS meeting copilot.
             Provide concise, accurate, and actionable answers to live conversation questions.
             """
+            }
         }
         
         // Append multimodal or OCR screen context if present

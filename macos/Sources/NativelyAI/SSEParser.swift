@@ -33,10 +33,13 @@ public struct SSEParser: Sendable {
             return nil
         }
         
-        if trimmed.hasPrefix("event:") {
-            currentEvent = trimmed.dropFirst(6).trimmingCharacters(in: .whitespaces)
-        } else if trimmed.hasPrefix("data:") {
-            let payload = trimmed.dropFirst(5).trimmingCharacters(in: .whitespaces)
+        if line.hasPrefix("event:") {
+            currentEvent = line.dropFirst(6).trimmingCharacters(in: .whitespaces)
+        } else if line.hasPrefix("data:") {
+            var payload = String(line.dropFirst(5))
+            if payload.hasPrefix(" ") {
+                payload.removeFirst()
+            }
             currentData.append(payload)
         }
         

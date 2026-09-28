@@ -103,9 +103,10 @@ public actor FallbackLadderEngine {
             let rawStream = client.stream(request: request, apiKey: apiKey)
             
             let gate = StreamGate()
+            let taskHolder = StreamTaskHolder()
             
             let outputStream = AsyncThrowingStream<String, Error> { continuation in
-                Task {
+                taskHolder.task = Task {
                     do {
                         for try await chunk in rawStream {
                             await gate.onChunk()
@@ -117,6 +118,9 @@ public actor FallbackLadderEngine {
                         await gate.onError(error)
                         continuation.finish(throwing: error)
                     }
+                }
+                continuation.onTermination = { _ in
+                    taskHolder.task?.cancel()
                 }
             }
             
@@ -132,6 +136,7 @@ public actor FallbackLadderEngine {
                     modelUsed: rung.model
                 )
             } catch {
+                taskHolder.task?.cancel()
                 lastError = error
                 let isAuth = (error as? AIClientError).map { err in
                     if case .httpError(let code, _) = err { return code == 401 || code == 403 }
@@ -204,4 +209,9 @@ private actor StreamGate {
             }
         }
     }
+}
+
+/// Thread-safe holder for managing stream cancellation.
+final class StreamTaskHolder: @unchecked Sendable {
+    var task: Task<Void, Never>?
 }

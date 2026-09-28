@@ -119,13 +119,15 @@ public actor TurnPlannerActor {
                     
                     let fullAnswer = await accumulatedTextActor.getText()
                     if let mId = meetingId, !fullAnswer.isEmpty {
+                        let metadataDict = ["provider": pUsed.rawValue, "model": mUsed]
+                        let metaJson = (try? JSONSerialization.data(withJSONObject: metadataDict)).flatMap { String(data: $0, encoding: .utf8) }
                         let interaction = AIInteraction(
                             meetingId: mId,
                             type: "answer",
                             timestamp: Int64(Date().timeIntervalSince1970 * 1000),
                             userQuery: question,
                             aiResponse: fullAnswer,
-                            metadataJson: "{\"provider\": \"\(pUsed.rawValue)\", \"model\": \"\(mUsed)\"}"
+                            metadataJson: metaJson
                         )
                         try? databaseRef.saveAIInteraction(interaction)
                     }

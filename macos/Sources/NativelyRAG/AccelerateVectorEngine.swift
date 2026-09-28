@@ -20,7 +20,9 @@ public enum AccelerateVectorEngine {
         
         let denominator = sqrt(normASq) * sqrt(normBSq)
         if denominator > 0 {
-            return dot / denominator
+            let sim = dot / denominator
+            if sim.isNaN { return 0.0 }
+            return min(max(sim, -1.0), 1.0)
         }
         return 0.0
     }
