@@ -58,6 +58,18 @@ public final class AppCoordinator: ObservableObject {
         overlayWindowManager.viewModel.configureTurnPlanner(planner: turnPlanner)
         overlayWindowManager.screenVisionCoordinator = screenVisionCoordinator
         
+        overlayWindowManager.viewModel.onEndMeeting = { [weak self] in
+            Task {
+                _ = await self?.stopMeetingSession()
+            }
+        }
+        overlayWindowManager.viewModel.onOpenLauncher = { [weak self] in
+            self?.launcherWindowManager.showLauncher()
+        }
+        overlayWindowManager.viewModel.onCropTrigger = { [weak self] in
+            self?.overlayWindowManager.handleCropTrigger()
+        }
+        
         // 2. Setup System Menu Bar
         menuBarController.setupMenuBar()
         setupMenuBarBindings()
@@ -102,11 +114,19 @@ public final class AppCoordinator: ObservableObject {
     private func setupCompanionServer() {
         companionServer.onDOMCaptured = { [weak self] payload in
             Task { @MainActor in
-                guard let text = payload.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
-                self?.overlayWindowManager.viewModel.attachScreenContext(
-                    ocrText: text,
-                    imageBase64: nil
-                )
+                if let text = payload.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+                    self?.overlayWindowManager.viewModel.attachScreenContext(
+                        ocrText: text,
+                        imageBase64: nil
+                    )
+                }
+                if let url = payload.url, let text = payload.text, !text.isEmpty {
+                    self?.overlayWindowManager.viewModel.attachWebContext(
+                        url: url,
+                        title: payload.title ?? url,
+                        charCount: text.count
+                    )
+                }
             }
         }
         

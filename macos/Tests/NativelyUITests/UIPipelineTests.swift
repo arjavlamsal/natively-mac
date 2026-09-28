@@ -162,9 +162,17 @@ struct UIPipelineTests {
         vm.attachScreenContext(ocrText: "Sample OCR problem statement", imageBase64: "data:image/png;base64,abc")
         #expect(vm.attachedOCRSnippet == "Sample OCR problem statement")
         
+        // Test web context attachment
+        vm.attachWebContext(url: "https://leetcode.com/problems/two-sum", title: "Two Sum", charCount: 1200)
+        #expect(vm.attachedWebContext?.domain == "leetcode.com")
+        #expect(vm.attachedWebContext?.chars == 1200)
+        
         // Test simulated streaming
         vm.askAI(prompt: "Explain binary search")
         #expect(vm.isAIStreaming == true)
+        #expect(vm.messages.count == 2)
+        #expect(vm.messages.first?.role == .user)
+        #expect(vm.messages.last?.role == .assistant)
         
         // Allow brief time for simulated streaming task
         for _ in 0..<30 {
@@ -174,11 +182,19 @@ struct UIPipelineTests {
         #expect(!vm.currentAIText.isEmpty)
         #expect(vm.ttftLatencyMs != nil)
         
+        // Test Quick Action Preset
+        vm.triggerQuickAction(presetNumber: 1)
+        #expect(vm.messages.count == 4)
+        #expect(vm.messages[2].isQuickActionLabel == true)
+        #expect(vm.messages[2].actionKind == "what_to_say")
+        
         // Test clear
         vm.clearSession()
         #expect(vm.currentAIText.isEmpty)
+        #expect(vm.messages.isEmpty)
         #expect(vm.transcripts.isEmpty)
         #expect(vm.attachedOCRSnippet == nil)
+        #expect(vm.attachedWebContext == nil)
     }
     
     @Test("StealthPanel hardware stealth and non-activating properties")

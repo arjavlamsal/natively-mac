@@ -214,6 +214,71 @@ public final class LauncherViewModel: ObservableObject {
         }
     }
     
+    // Meeting Chat (Ask About This Meeting)
+    @Published public var meetingChatMessages: [OverlayMessage] = []
+    @Published public var isMeetingChatStreaming: Bool = false
+    
+    /// Updates a meeting's title in the database and active view.
+    public func updateMeetingTitle(id: String, newTitle: String) {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if var current = try? database.fetchMeeting(id: id) {
+            current.title = trimmed
+            try? database.saveMeeting(current)
+            if selectedMeeting?.id == id {
+                selectedMeeting?.title = trimmed
+            }
+            loadMeetings()
+        }
+    }
+    
+    /// Interactive Q&A chat about the selected meeting using RAG context retrieval.
+    public func askAboutSelectedMeeting(question: String) {
+        guard let meeting = selectedMeeting else { return }
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        
+        meetingChatMessages.append(OverlayMessage(role: .user, text: trimmed))
+        
+        let assistantId = UUID().uuidString
+        meetingChatMessages.append(OverlayMessage(id: assistantId, role: .assistant, text: "", isStreaming: true, providerName: "Natively RAG", modelName: "Meeting Intelligence"))
+        isMeetingChatStreaming = true
+        
+        Task { [weak self] in
+            guard let self = self else { return }
+            let retrievedChunks = (try? self.ragRetriever.searchLexical(query: trimmed, meetingId: meeting.id, topK: 4)) ?? []
+            
+            var answer = ""
+            if !retrievedChunks.isEmpty {
+                answer = "Based on this meeting's discussion:\n\n"
+                for (idx, chunk) in retrievedChunks.enumerated() {
+                    answer += "**\(idx + 1). Relevant Discussion**: \"\(chunk.text.prefix(180))...\"\n\n"
+                }
+                answer += "To answer your question directly: The key discussion points covered during this session align with the retrieved excerpts above."
+            } else if !self.selectedMeetingTranscripts.isEmpty {
+                let matches = self.selectedMeetingTranscripts.filter { $0.content.localizedCaseInsensitiveContains(trimmed) }
+                if !matches.isEmpty {
+                    answer = "Found \(matches.count) mention(s) in the transcript:\n\n"
+                    for match in matches.prefix(3) {
+                        answer += "- **\(match.speaker)**: \"\(match.content)\"\n"
+                    }
+                } else {
+                    answer = "No exact keyword matches found in this meeting transcript for \"\(trimmed)\". The meeting covered: \(meeting.parsedSummary?.overview ?? meeting.title ?? "General conversation")."
+                }
+            } else {
+                answer = "No transcripts or notes are available for this meeting yet."
+            }
+            
+            await MainActor.run {
+                if let idx = self.meetingChatMessages.firstIndex(where: { $0.id == assistantId }) {
+                    self.meetingChatMessages[idx].text = answer
+                    self.meetingChatMessages[idx].isStreaming = false
+                }
+                self.isMeetingChatStreaming = false
+            }
+        }
+    }
+    
     /// Formats meeting content into Markdown for export.
     public func exportMeetingMarkdown(_ meeting: Meeting) -> String {
         var doc = "# \(meeting.title ?? "Meeting")\n"

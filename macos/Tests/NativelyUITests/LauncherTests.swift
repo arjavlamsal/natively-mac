@@ -88,4 +88,47 @@ struct LauncherTests {
         #expect(md.contains("## Transcript"))
         #expect(md.contains("**Arjav**: We should eliminate electron webviews."))
     }
+    
+    @Test("LauncherViewModel updates meeting title and performs interactive Q&A")
+    @MainActor
+    func testMeetingTitleUpdateAndQAChat() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let meeting = Meeting(
+            id: "qa-test",
+            title: "Original Title",
+            startTime: 200000,
+            durationMs: 900000,
+            summaryJson: "Discussed Swift 6 concurrency.",
+            source: "native"
+        )
+        try db.saveMeeting(meeting)
+        
+        let turn = TranscriptTurn(
+            meetingId: "qa-test",
+            speaker: "Interviewer",
+            content: "Can you explain actor isolation and reentrancy?",
+            timestampMs: 200010
+        )
+        try db.saveTranscriptTurn(turn)
+        
+        let vm = LauncherViewModel(database: db, companionServer: CompanionServer(port: 4197))
+        vm.selectMeeting(meeting)
+        
+        // 1. Rename meeting
+        vm.updateMeetingTitle(id: "qa-test", newTitle: "Renamed Concurrency Session")
+        #expect(vm.selectedMeeting?.title == "Renamed Concurrency Session")
+        
+        // 2. Ask question about meeting
+        vm.askAboutSelectedMeeting(question: "What did the interviewer ask about actors?")
+        #expect(vm.meetingChatMessages.count == 2)
+        #expect(vm.meetingChatMessages.first?.role == .user)
+        #expect(vm.meetingChatMessages.last?.role == .assistant)
+        
+        // Allow brief time for task to finish streaming/lexical search
+        for _ in 0..<30 {
+            if let last = vm.meetingChatMessages.last, !last.text.isEmpty { break }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(!vm.meetingChatMessages.last!.text.isEmpty)
+    }
 }
