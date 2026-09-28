@@ -105,6 +105,22 @@ public final class AppDatabase: Sendable {
             """)
         }
 
+        migrator.registerMigration("v2_vector_rag_schema") { db in
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS vector_chunks (
+                    id TEXT PRIMARY KEY,
+                    meeting_id TEXT,
+                    chunk_index INTEGER,
+                    text TEXT NOT NULL,
+                    embedding_blob BLOB,
+                    embedding_dimensions INTEGER,
+                    timestamp_ms INTEGER,
+                    FOREIGN KEY(meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_vector_chunks_meeting ON vector_chunks(meeting_id);
+            """)
+        }
+
         return migrator
     }
 
@@ -225,6 +241,43 @@ public final class AppDatabase: Sendable {
             } else {
                 _ = try AppStateRecord.filter(Column("key") == key).deleteAll(db)
             }
+        }
+    }
+
+    // MARK: - Vector Chunks (RAG)
+
+    public func saveVectorChunk(_ chunk: VectorChunk) throws {
+        try dbWriter.write { db in
+            let record = VectorChunkRecord(from: chunk)
+            try record.save(db)
+        }
+    }
+
+    public func saveVectorChunks(_ chunks: [VectorChunk]) throws {
+        try dbWriter.write { db in
+            for chunk in chunks {
+                let record = VectorChunkRecord(from: chunk)
+                try record.save(db)
+            }
+        }
+    }
+
+    public func fetchVectorChunks(meetingId: String? = nil) throws -> [VectorChunk] {
+        try dbWriter.read { db in
+            let request: QueryInterfaceRequest<VectorChunkRecord>
+            if let meetingId = meetingId {
+                request = VectorChunkRecord.filter(Column("meeting_id") == meetingId).order(Column("chunk_index").asc)
+            } else {
+                request = VectorChunkRecord.order(Column("timestamp_ms").desc)
+            }
+            let records = try request.fetchAll(db)
+            return records.map { $0.toVectorChunk() }
+        }
+    }
+
+    public func deleteVectorChunks(forMeetingId meetingId: String) throws {
+        try dbWriter.write { db in
+            _ = try VectorChunkRecord.filter(Column("meeting_id") == meetingId).deleteAll(db)
         }
     }
 }

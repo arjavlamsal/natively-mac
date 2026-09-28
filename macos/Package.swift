@@ -13,6 +13,8 @@ let package = Package(
         .library(name: "NativelyAudio", targets: ["NativelyAudio"]),
         .library(name: "NativelyVision", targets: ["NativelyVision"]),
         .library(name: "NativelyAI", targets: ["NativelyAI"]),
+        .library(name: "NativelyCompanion", targets: ["NativelyCompanion"]),
+        .library(name: "NativelyRAG", targets: ["NativelyRAG"]),
         .library(name: "NativelyUI", targets: ["NativelyUI"]),
     ],
     dependencies: [
@@ -66,6 +68,22 @@ let package = Package(
             path: "Sources/NativelyAI"
         ),
         .target(
+            name: "NativelyCompanion",
+            dependencies: [
+                "NativelyCore",
+                "NativelySecurity"
+            ],
+            path: "Sources/NativelyCompanion"
+        ),
+        .target(
+            name: "NativelyRAG",
+            dependencies: [
+                "NativelyCore",
+                "NativelyDatabase"
+            ],
+            path: "Sources/NativelyRAG"
+        ),
+        .target(
             name: "NativelyUI",
             dependencies: [
                 "NativelyCore",
@@ -74,6 +92,8 @@ let package = Package(
                 "NativelyAudio",
                 "NativelyVision",
                 "NativelyAI",
+                "NativelyCompanion",
+                "NativelyRAG",
             ],
             path: "Sources/NativelyUI"
         ),
@@ -114,11 +134,29 @@ let package = Package(
             path: "Tests/NativelyAITests"
         ),
         .testTarget(
+            name: "NativelyCompanionTests",
+            dependencies: [
+                "NativelyCompanion",
+                "NativelyDatabase"
+            ],
+            path: "Tests/NativelyCompanionTests"
+        ),
+        .testTarget(
+            name: "NativelyRAGTests",
+            dependencies: [
+                "NativelyRAG",
+                "NativelyDatabase"
+            ],
+            path: "Tests/NativelyRAGTests"
+        ),
+        .testTarget(
             name: "NativelyUITests",
             dependencies: [
                 "NativelyUI",
                 "NativelyDatabase",
-                "NativelyAudio"
+                "NativelyAudio",
+                "NativelyCompanion",
+                "NativelyRAG"
             ],
             path: "Tests/NativelyUITests"
         )

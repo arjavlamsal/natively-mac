@@ -160,3 +160,49 @@ public struct AppStateRecord: Codable, FetchableRecord, PersistableRecord, Table
         self.value = value
     }
 }
+
+// MARK: - VectorChunkRecord
+public struct VectorChunkRecord: Codable, FetchableRecord, PersistableRecord, TableRecord {
+    public static let databaseTableName = "vector_chunks"
+
+    public var id: String
+    public var meeting_id: String?
+    public var chunk_index: Int
+    public var text: String
+    public var embedding_blob: Data?
+    public var embedding_dimensions: Int?
+    public var timestamp_ms: Int64
+
+    public init(from chunk: VectorChunk) {
+        self.id = chunk.id
+        self.meeting_id = chunk.meetingId
+        self.chunk_index = chunk.chunkIndex
+        self.text = chunk.text
+        self.timestamp_ms = chunk.timestampMs
+        
+        if let floats = chunk.embedding {
+            self.embedding_dimensions = floats.count
+            self.embedding_blob = floats.withUnsafeBufferPointer { Data(buffer: $0) }
+        } else {
+            self.embedding_dimensions = nil
+            self.embedding_blob = nil
+        }
+    }
+
+    public func toVectorChunk() -> VectorChunk {
+        var floats: [Float]? = nil
+        if let blob = embedding_blob, let dims = embedding_dimensions, dims > 0 {
+            floats = blob.withUnsafeBytes { buffer in
+                Array(buffer.bindMemory(to: Float.self))
+            }
+        }
+        return VectorChunk(
+            id: id,
+            meetingId: meeting_id,
+            chunkIndex: chunk_index,
+            text: text,
+            embedding: floats,
+            timestampMs: timestamp_ms
+        )
+    }
+}

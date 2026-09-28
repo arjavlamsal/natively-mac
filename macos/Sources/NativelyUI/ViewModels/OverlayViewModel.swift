@@ -184,10 +184,10 @@ public final class OverlayViewModel: ObservableObject {
                 ]
                 
                 for chunk in simulatedChunks {
-                    try? await Task.sleep(nanoseconds: 120_000_000)
+                    try? await Task.sleep(nanoseconds: 20_000_000)
                     if !firstTokenRecorded {
                         firstTokenRecorded = true
-                        self?.ttftLatencyMs = 120.0
+                        self?.ttftLatencyMs = 20.0
                     }
                     self?.currentAIText.append(chunk)
                 }

@@ -167,7 +167,10 @@ struct UIPipelineTests {
         #expect(vm.isAIStreaming == true)
         
         // Allow brief time for simulated streaming task
-        try? await Task.sleep(nanoseconds: 200_000_000)
+        for _ in 0..<30 {
+            if !vm.currentAIText.isEmpty { break }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
         #expect(!vm.currentAIText.isEmpty)
         #expect(vm.ttftLatencyMs != nil)
         
