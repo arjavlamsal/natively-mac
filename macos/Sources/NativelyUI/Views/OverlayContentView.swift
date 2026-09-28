@@ -2,9 +2,10 @@ import SwiftUI
 import AppKit
 import NativelyCore
 
-/// Top-level stealth overlay interface adhering to macOS Human Interface Guidelines.
-/// Hosts the TopPillBar, Context chips, Rolling Transcript, Conversation stream,
-/// persistent Quick Action pills, and the bottom prompt toolbar.
+/// Top-level stealth overlay interface matching Natively's original layout.
+/// Features a dedicated TopPillBar, Context chips, Live Transcripts, AI Response stream,
+/// persistent Quick Action pills, and a fully featured bottom toolbar with model selection,
+/// settings, crop, and mouse passthrough.
 public struct OverlayContentView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     public var onCropTrigger: () -> Void = {}
@@ -36,7 +37,7 @@ public struct OverlayContentView: View {
             // 2. EXPANDED MEETING INTERFACE
             if viewModel.isExpanded {
                 VStack(spacing: 10) {
-                    // Context Status Chips (Web DOM, Screen OCR, Screenshots)
+                    // Context Status Chips (Web DOM, Screen OCR)
                     contextChipsRow
                     
                     // Rolling Transcript Bar
@@ -55,20 +56,21 @@ public struct OverlayContentView: View {
                     // Bottom Input & Controls Toolbar
                     bottomToolbar
                 }
-                .padding(12)
+                .padding(14)
                 .background(
                     NativelyTheme.VisualEffectBackground(material: .hudWindow, blendingMode: .withinWindow)
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(NativelyTheme.glowStroke, lineWidth: 0.5)
+                        .stroke(NativelyTheme.borderHighlight, lineWidth: 0.5)
                 )
-                .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 8)
+                .shadow(color: Color.black.opacity(0.45), radius: 18, x: 0, y: 8)
             }
         }
-        .padding(8)
-        .frame(width: 540)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(width: 510)
         .animation(NativelyTheme.smoothSpring, value: viewModel.isExpanded)
     }
     
@@ -77,147 +79,145 @@ public struct OverlayContentView: View {
     @ViewBuilder
     private var contextChipsRow: some View {
         if viewModel.attachedWebContext != nil || viewModel.attachedOCRSnippet != nil || viewModel.attachedImageBase64 != nil {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 // Web Page Context Chip
                 if let web = viewModel.attachedWebContext {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: "globe")
-                            .font(.system(size: 9.5))
+                            .font(.system(size: 10))
                             .foregroundColor(NativelyTheme.cyanBlue)
                         Text("\(web.domain) · \(web.chars) chars")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white)
                             .lineLimit(1)
                         
                         Button(action: {
                             viewModel.clearWebContext()
                         }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 8))
-                                .foregroundColor(.white.opacity(0.6))
+                                .font(.system(size: 9))
+                                .foregroundColor(.white.opacity(0.7))
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(NativelyTheme.cyanBlue.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(NativelyTheme.cyanBlue.opacity(0.18))
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(NativelyTheme.cyanBlue.opacity(0.3), lineWidth: 0.5)
+                        Capsule()
+                            .stroke(NativelyTheme.cyanBlue.opacity(0.35), lineWidth: 0.5)
                     )
                 }
                 
                 // Screen OCR Chip
                 if viewModel.attachedOCRSnippet != nil {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: "doc.text.viewfinder")
-                            .font(.system(size: 9.5))
+                            .font(.system(size: 10))
                             .foregroundColor(NativelyTheme.warningAmber)
                         Text("Screen OCR Attached")
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white)
                         
                         Button(action: {
                             viewModel.clearScreenContext()
                         }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 8))
-                                .foregroundColor(.white.opacity(0.6))
+                                .font(.system(size: 9))
+                                .foregroundColor(.white.opacity(0.7))
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(NativelyTheme.warningAmber.opacity(0.14))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(NativelyTheme.warningAmber.opacity(0.18))
+                    .clipShape(Capsule())
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(NativelyTheme.warningAmber.opacity(0.3), lineWidth: 0.5)
+                        Capsule()
+                            .stroke(NativelyTheme.warningAmber.opacity(0.35), lineWidth: 0.5)
                     )
                 }
                 
                 Spacer()
             }
-            .padding(.horizontal, 2)
         }
     }
     
     // MARK: - Quick Action Buttons Row
     
     private var quickActionButtonsRow: some View {
-        HStack(spacing: 5) {
-            actionPill(label: "What to answer?", icon: "pencil", action: {
+        HStack(spacing: 6) {
+            actionPill(label: "What to answer?", icon: "pencil", shortcut: "⌘1", action: {
                 viewModel.triggerQuickAction(presetNumber: 1)
             })
             
-            actionPill(label: "Clarify", icon: "bubble.left.and.bubble.right", action: {
+            actionPill(label: "Clarify", icon: "bubble.left.and.bubble.right", shortcut: "⌘2", action: {
                 viewModel.triggerQuickAction(presetNumber: 2)
             })
             
-            actionPill(label: "Recap", icon: "arrow.clockwise", action: {
+            actionPill(label: "Recap", icon: "arrow.clockwise", shortcut: "⌘3", action: {
                 viewModel.triggerQuickAction(presetNumber: 3)
             })
             
-            actionPill(label: "Follow-up", icon: "questionmark.circle", action: {
+            actionPill(label: "Follow-up", icon: "questionmark.circle", shortcut: "⌘4", action: {
                 viewModel.triggerQuickAction(presetNumber: 4)
             })
             
             Spacer()
             
-            // "Answer" / "Stop" Voice Button
+            // "Answer" / "Stop" Voice Recording Button
             Button(action: {
                 viewModel.toggleManualRecording()
             }) {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     if viewModel.isManualRecording {
                         Circle()
                             .fill(NativelyTheme.dangerRed)
-                            .frame(width: 6, height: 6)
+                            .frame(width: 7, height: 7)
                         Text("Stop")
-                            .font(.system(size: 10.5, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(NativelyTheme.dangerRed)
                     } else {
                         Image(systemName: "bolt.fill")
-                            .font(.system(size: 9.5))
+                            .font(.system(size: 10))
                             .foregroundColor(NativelyTheme.warningAmber)
                         Text("Answer")
-                            .font(.system(size: 10.5, weight: .medium))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundColor(.white)
                     }
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4.5)
-                .background(viewModel.isManualRecording ? NativelyTheme.dangerRed.opacity(0.2) : Color.white.opacity(0.08))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5.5)
+                .background(viewModel.isManualRecording ? NativelyTheme.dangerRed.opacity(0.2) : Color.white.opacity(0.09))
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .stroke(viewModel.isManualRecording ? NativelyTheme.dangerRed.opacity(0.5) : Color.white.opacity(0.14), lineWidth: 0.5)
+                        .stroke(viewModel.isManualRecording ? NativelyTheme.dangerRed.opacity(0.5) : NativelyTheme.borderMuted, lineWidth: 0.5)
                 )
             }
             .buttonStyle(.plain)
             .help("Click to manually trigger instant answer or record voice")
         }
-        .padding(.horizontal, 2)
     }
     
-    private func actionPill(label: String, icon: String, action: @escaping () -> Void) -> some View {
+    private func actionPill(label: String, icon: String, shortcut: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 9))
-                    .foregroundColor(.white.opacity(0.75))
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.white.opacity(0.8))
                 Text(label)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4.5)
-            .background(Color.white.opacity(0.06))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5.5)
+            .background(Color.white.opacity(0.07))
             .clipShape(Capsule())
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                    .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
@@ -226,57 +226,63 @@ public struct OverlayContentView: View {
     // MARK: - Bottom Toolbar
     
     private var bottomToolbar: some View {
-        VStack(spacing: 6) {
-            // Text Input Box
+        VStack(spacing: 8) {
+            // Text Input Field Box
             HStack(spacing: 8) {
-                TextField("Ask anything on screen or conversation, or ⌘⇧X to crop...", text: $viewModel.quickPromptText)
+                TextField("Ask anything on screen or conversation (↵ to send)...", text: $viewModel.quickPromptText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 12))
+                    .font(.system(size: 12.5))
                     .foregroundColor(.white)
                     .focused($isInputFocused)
                     .onSubmit {
                         submitPrompt()
                     }
                 
-                // Submit Button
+                // Submit Button (Blue Arrow Circle)
                 Button(action: submitPrompt) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(viewModel.quickPromptText.isEmpty ? .white.opacity(0.2) : Color.accentColor)
+                    ZStack {
+                        Circle()
+                            .fill(viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.white.opacity(0.12) : NativelyTheme.skyAccent)
+                            .frame(width: 26, height: 26)
+                        
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                    }
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(Color.white.opacity(0.05))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(NativelyTheme.bgElevated.opacity(0.8))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                    .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
             )
             
-            // Bottom Controls Bar (Model Selector, Settings, Crop, Direct Assist)
+            // Bottom Action Controls (Model Selector, Mode, Crop, Passthrough, Settings)
             HStack(spacing: 8) {
-                // Model Selector Button with Popover
+                // 1. Model Selector Dropdown Button
                 Button(action: {
                     viewModel.isModelSelectorPresented.toggle()
                 }) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Text(viewModel.currentModel.name)
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundColor(.white.opacity(0.85))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 8))
+                            .font(.system(size: 8.5))
                             .foregroundColor(.white.opacity(0.5))
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3.5)
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
                     )
                 }
                 .buttonStyle(.plain)
@@ -290,42 +296,90 @@ public struct OverlayContentView: View {
                         .foregroundColor(NativelyTheme.purpleAccent)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(NativelyTheme.purpleAccent.opacity(0.16))
+                        .background(NativelyTheme.purpleAccent.opacity(0.2))
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
                 
+                Divider()
+                    .frame(height: 14)
+                    .background(NativelyTheme.borderSubtle)
+                
+                // 2. Active Mode Menu
+                Menu {
+                    ForEach(viewModel.availableModes) { mode in
+                        Button(action: {
+                            viewModel.selectMode(mode)
+                        }) {
+                            HStack {
+                                Text(mode.name)
+                                if mode.id == viewModel.activeMode.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "waveform.path.ecg")
+                            .font(.system(size: 10))
+                            .foregroundColor(NativelyTheme.cyanBlue)
+                        Text(viewModel.activeMode.name)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.85))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 7.5, weight: .bold))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .menuStyle(.borderlessButton)
+                
                 Spacer()
                 
-                // Screen Crop Button
+                // 3. Screen Crop Button (⌘⇧X)
                 Button(action: {
                     onCropTrigger()
                     viewModel.onCropTrigger?()
                 }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "crop")
-                            .font(.system(size: 10))
-                        Text("Crop")
-                            .font(.system(size: 10.5, weight: .medium))
-                    }
-                    .foregroundColor(.white.opacity(0.75))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3.5)
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    Image(systemName: "crop")
+                        .font(.system(size: 12))
+                        .foregroundColor(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber : .white.opacity(0.8))
+                        .padding(6)
+                        .background(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .help("Select area to crop (⌘⇧X)")
+                .help("Crop Screen Region & Vision OCR (⌘⇧X)")
                 
-                // Quick Settings Popover Button
+                // 4. Mouse Passthrough Button (⌘⇧B)
+                Button(action: {
+                    withAnimation(NativelyTheme.quickSpring) {
+                        viewModel.isPassthrough.toggle()
+                    }
+                }) {
+                    Image(systemName: viewModel.isPassthrough ? "hand.point.up.braille" : "cursorarrow.rays")
+                        .font(.system(size: 12))
+                        .foregroundColor(viewModel.isPassthrough ? NativelyTheme.warningAmber : .white.opacity(0.8))
+                        .padding(6)
+                        .background(viewModel.isPassthrough ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Toggle Mouse Passthrough (⌘⇧B)")
+                
+                // 5. Quick Settings Popover Button
                 Button(action: {
                     viewModel.isQuickSettingsPresented.toggle()
                 }) {
                     Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.75))
-                        .padding(5)
-                        .background(Color.white.opacity(0.06))
-                        .clipShape(Circle())
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(6)
+                        .background(Color.white.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .help("Quick Settings & Preferences")

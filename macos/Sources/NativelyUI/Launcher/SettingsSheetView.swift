@@ -1,14 +1,14 @@
 import SwiftUI
 import NativelySecurity
 
-/// Comprehensive Settings sheet adhering to macOS Human Interface Guidelines.
-/// Configures AI credentials in macOS Keychain, speech recognition engines,
-/// hardware stealth isolation, browser companion pairing, and user profile intelligence.
+/// Settings modal replicating the original Natively SettingsOverlay layout.
+/// Features a dark sidebar with icon navigation, header with close action,
+/// and dark elevated cards for AI credentials, audio configuration, stealth, and profile context.
 public struct SettingsSheetView: View {
     @ObservedObject public var viewModel: LauncherViewModel
     @Environment(\.dismiss) private var dismiss
     
-    @State private var selectedTab = 0
+    @State private var selectedTab = "ai-providers"
     @State private var isTokenCopied = false
     
     // Audio Settings
@@ -26,165 +26,261 @@ public struct SettingsSheetView: View {
     }
     
     public var body: some View {
-        VStack(spacing: 0) {
-            // Header Bar
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "gearshape.2.fill")
-                        .font(.system(size: 15))
-                        .foregroundColor(NativelyTheme.purpleAccent)
-                    Text("Settings")
-                        .font(.system(size: 15, weight: .bold))
+        HStack(spacing: 0) {
+            // LEFT SIDEBAR (Width: 210)
+            sidebarView
+                .frame(width: 210)
+                .background(NativelyTheme.bgSecondary)
+            
+            Divider()
+                .background(NativelyTheme.borderSubtle)
+            
+            // RIGHT CONTENT PANEL
+            VStack(alignment: .leading, spacing: 0) {
+                // Header (Title, Subtitle & Close Button)
+                panelHeaderBar
+                
+                Divider()
+                    .background(NativelyTheme.borderSubtle)
+                
+                // Panel Scrollable Content
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        switch selectedTab {
+                        case "general":
+                            generalSection
+                        case "ai-providers":
+                            aiProvidersSection
+                        case "audio":
+                            audioDevicesSection
+                        case "stealth":
+                            stealthSection
+                        case "keybinds":
+                            keybindsSection
+                        case "companion":
+                            companionSection
+                        case "profile":
+                            profileSection
+                        case "about":
+                            aboutSection
+                        default:
+                            aiProvidersSection
+                        }
+                    }
+                    .padding(24)
                 }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(NativelyTheme.bgPrimary)
+        }
+        .frame(width: 820, height: 580)
+    }
+    
+    // MARK: - Left Sidebar
+    
+    private var sidebarView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // App Title & Version Header
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(NativelyTheme.purpleAccent.opacity(0.2))
+                        .frame(width: 26, height: 26)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(NativelyTheme.purpleAccent)
+                }
+                
+                Text("Settings")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(NativelyTheme.textPrimary)
                 
                 Spacer()
                 
-                Button("Done") {
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-                .controlSize(.small)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
-            
-            Divider()
-                .opacity(0.6)
-            
-            // Tab Picker Bar
-            HStack(spacing: 4) {
-                tabButton(title: "AI Credentials", systemImage: "key.fill", tag: 0)
-                tabButton(title: "Audio & STT", systemImage: "waveform", tag: 1)
-                tabButton(title: "Stealth & Hotkeys", systemImage: "shield.lefthalf.filled", tag: 2)
-                tabButton(title: "Companion", systemImage: "safari.fill", tag: 3)
-                tabButton(title: "Profile", systemImage: "person.crop.circle", tag: 4)
+                Text("v2.7")
+                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                    .foregroundColor(NativelyTheme.emeraldGreen)
+                    .padding(.horizontal, 4.5)
+                    .padding(.vertical, 1.5)
+                    .background(NativelyTheme.emeraldGreen.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            .padding(.top, 18)
+            .padding(.bottom, 14)
             
             Divider()
-                .opacity(0.5)
+                .background(NativelyTheme.borderSubtle)
             
-            // Tab Content
+            // Nav Items List
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    switch selectedTab {
-                    case 0:
-                        apiKeysSection
-                    case 1:
-                        audioSection
-                    case 2:
-                        stealthSection
-                    case 3:
-                        companionSection
-                    case 4:
-                        profileSection
-                    default:
-                        EmptyView()
-                    }
+                VStack(spacing: 2) {
+                    sidebarNavItem(id: "general", label: "General", icon: "gearshape")
+                    sidebarNavItem(id: "ai-providers", label: "AI Providers", icon: "brain.head.profile")
+                    sidebarNavItem(id: "audio", label: "Audio & Devices", icon: "waveform")
+                    sidebarNavItem(id: "stealth", label: "Stealth Mode", icon: "shield.lefthalf.filled")
+                    sidebarNavItem(id: "keybinds", label: "Keybinds", icon: "keyboard")
+                    sidebarNavItem(id: "companion", label: "Companion", icon: "network")
+                    sidebarNavItem(id: "profile", label: "Intelligence", icon: "person.crop.circle")
+                    sidebarNavItem(id: "about", label: "About", icon: "info.circle")
                 }
-                .padding(20)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 10)
             }
         }
-        .frame(width: 580, height: 520)
-        .background(Color(nsColor: .windowBackgroundColor))
     }
     
-    // MARK: - Tab Button
-    
-    private func tabButton(title: String, systemImage: String, tag: Int) -> some View {
-        let isSelected = selectedTab == tag
+    private func sidebarNavItem(id: String, label: String, icon: String) -> some View {
+        let isSelected = selectedTab == id
         return Button(action: {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                selectedTab = tag
+            withAnimation(NativelyTheme.quickSpring) {
+                selectedTab = id
             }
         }) {
-            HStack(spacing: 5) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 11.5, weight: isSelected ? .semibold : .regular))
+            HStack(spacing: 9) {
+                Image(systemName: icon)
+                    .font(.system(size: 12.5))
+                    .foregroundColor(isSelected ? NativelyTheme.skyAccent : NativelyTheme.textSecondary)
+                    .frame(width: 18)
+                
+                Text(label)
+                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                    .foregroundColor(isSelected ? NativelyTheme.textPrimary : NativelyTheme.textSecondary)
+                
+                Spacer()
             }
-            .foregroundColor(isSelected ? .white : .primary.opacity(0.8))
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, 7)
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isSelected ? Color.accentColor : Color.clear)
+                isSelected ? Color.white.opacity(0.08) : Color.clear
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(isSelected ? Color.white.opacity(0.12) : Color.clear, lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
     }
     
-    // MARK: - Tab 0: AI Credentials
+    // MARK: - Right Panel Header
     
-    private var apiKeysSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("API Credentials")
-                    .font(.system(size: 13, weight: .bold))
-                Text("Keys are encrypted and stored in your local macOS Keychain. They never leave your Mac except when making direct, encrypted calls to the AI provider.")
+    private var panelHeaderBar: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(panelTitle)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(NativelyTheme.textPrimary)
+                Text(panelSubtitle)
                     .font(.system(size: 11.5))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(NativelyTheme.textTertiary)
             }
             
-            VStack(spacing: 12) {
-                keyField(
-                    label: "Anthropic Claude (Claude 3.5 Sonnet)",
-                    placeholder: "sk-ant-...",
-                    value: $viewModel.anthropicKey,
-                    keyName: "anthropic_api_key",
-                    icon: "brain.head.profile"
-                )
-                
-                keyField(
-                    label: "OpenAI (GPT-4o)",
-                    placeholder: "sk-proj-...",
-                    value: $viewModel.openAIKey,
-                    keyName: "openai_api_key",
-                    icon: "bolt.fill"
-                )
-                
-                keyField(
-                    label: "Google Gemini (Gemini 2.0 Flash / Pro)",
-                    placeholder: "AIzaSy...",
-                    value: $viewModel.geminiKey,
-                    keyName: "gemini_api_key",
-                    icon: "sparkles"
-                )
-                
-                keyField(
-                    label: "Groq Cloud (Fast Text / Llama 3.3)",
-                    placeholder: "gsk_...",
-                    value: $viewModel.groqKey,
-                    keyName: "groq_api_key",
-                    icon: "flame.fill"
-                )
-                
-                keyField(
-                    label: "DeepSeek (DeepSeek V3)",
-                    placeholder: "sk-...",
-                    value: $viewModel.deepSeekKey,
-                    keyName: "deepseek_api_key",
-                    icon: "globe"
-                )
+            Spacer()
+            
+            // Close Button (✕)
+            Button(action: {
+                dismiss()
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(NativelyTheme.textSecondary)
+                    .padding(6)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Circle())
             }
-            .padding(14)
-            .nativeCard()
+            .buttonStyle(.plain)
+            .keyboardShortcut(.cancelAction)
+            .help("Close Settings")
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
+        .background(NativelyTheme.bgSecondary)
+    }
+    
+    private var panelTitle: String {
+        switch selectedTab {
+        case "general": return "General Preferences"
+        case "ai-providers": return "AI Providers & Credentials"
+        case "audio": return "Audio Capture & STT"
+        case "stealth": return "Hardware Stealth & Isolation"
+        case "keybinds": return "Global Keyboard Shortcuts"
+        case "companion": return "Browser Companion Server"
+        case "profile": return "Profile Intelligence Context"
+        case "about": return "About Natively"
+        default: return "Settings"
+        }
+    }
+    
+    private var panelSubtitle: String {
+        switch selectedTab {
+        case "general": return "Application behavior, startup, and interface appearance"
+        case "ai-providers": return "Configure custom API keys stored securely in macOS Keychain"
+        case "audio": return "Select speech recognition engines, audio channels, and VAD thresholds"
+        case "stealth": return "Hardware-level window isolation parameters"
+        case "keybinds": return "Quick trigger hotkeys for overlays, cropping, and instant presets"
+        case "companion": return "Pair local browser extension to sync problems and questions"
+        case "profile": return "Add professional background and resume to ground AI answers"
+        case "about": return "Version, architecture, and system information"
+        default: return ""
+        }
+    }
+    
+    // MARK: - AI Providers Section
+    
+    private var aiProvidersSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            keyField(
+                label: "Anthropic Claude (Claude 3.5 Sonnet)",
+                placeholder: "sk-ant-...",
+                value: $viewModel.anthropicKey,
+                keyName: "anthropic_api_key",
+                icon: "brain.head.profile"
+            )
+            
+            keyField(
+                label: "OpenAI (GPT-4o)",
+                placeholder: "sk-proj-...",
+                value: $viewModel.openAIKey,
+                keyName: "openai_api_key",
+                icon: "bolt.fill"
+            )
+            
+            keyField(
+                label: "Google Gemini (Gemini 2.0 Flash / Pro)",
+                placeholder: "AIzaSy...",
+                value: $viewModel.geminiKey,
+                keyName: "gemini_api_key",
+                icon: "sparkles"
+            )
+            
+            keyField(
+                label: "Groq Cloud (Fast Llama 3.3 70B)",
+                placeholder: "gsk_...",
+                value: $viewModel.groqKey,
+                keyName: "groq_api_key",
+                icon: "flame.fill"
+            )
+            
+            keyField(
+                label: "DeepSeek (DeepSeek V3)",
+                placeholder: "sk-...",
+                value: $viewModel.deepSeekKey,
+                keyName: "deepseek_api_key",
+                icon: "globe"
+            )
         }
     }
     
     private func keyField(label: String, placeholder: String, value: Binding<String>, keyName: String, icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: icon)
                     .font(.system(size: 11))
                     .foregroundColor(NativelyTheme.purpleAccent)
                 Text(label)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(NativelyTheme.textPrimary)
                 
                 Spacer()
                 
@@ -192,7 +288,7 @@ public struct SettingsSheetView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "checkmark.shield.fill")
                             .font(.system(size: 10))
-                        Text("Saved")
+                        Text("Saved in Keychain")
                             .font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundColor(NativelyTheme.emeraldGreen)
@@ -200,242 +296,328 @@ public struct SettingsSheetView: View {
             }
             
             SecureField(placeholder, text: value)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 11.5, design: .monospaced))
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(NativelyTheme.textPrimary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(NativelyTheme.bgElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
+                )
                 .onChange(of: value.wrappedValue) { _, newValue in
                     viewModel.saveKeychainKey(name: keyName, value: newValue)
                 }
         }
+        .padding(14)
+        .background(NativelyTheme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(NativelyTheme.borderSubtle, lineWidth: 0.5)
+        )
     }
     
-    // MARK: - Tab 1: Audio & STT
+    // MARK: - Audio & Devices Section
     
-    private var audioSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Speech Recognition Engine")
-                    .font(.system(size: 13, weight: .bold))
-                Text("Select the transcription engine used to convert live microphone and system audio into text.")
-                    .font(.system(size: 11.5))
-                    .foregroundColor(.secondary)
-            }
-            
+    private var audioDevicesSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // STT Picker Card
             VStack(alignment: .leading, spacing: 10) {
-                Picker("STT Engine", selection: $sttEngine) {
+                Text("SPEECH RECOGNITION ENGINE")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(NativelyTheme.textTertiary)
+                
+                Picker("", selection: $sttEngine) {
                     Text("WhisperKit (Apple Silicon On-Device Neural Engine)").tag("whisperkit")
                     Text("Apple Speech (macOS Native SFSpeechRecognizer)").tag("apple_speech")
                     Text("Groq Whisper Cloud (Ultra-Fast Remote Transcription)").tag("groq_cloud")
                 }
                 .pickerStyle(.radioGroup)
+                .foregroundColor(NativelyTheme.textPrimary)
             }
             .padding(14)
-            .nativeCard()
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(NativelyTheme.borderSubtle, lineWidth: 0.5)
+            )
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Audio Capture Pipeline")
-                    .font(.system(size: 13, weight: .bold))
-            }
-            
+            // Audio Channels Card
             VStack(alignment: .leading, spacing: 12) {
+                Text("AUDIO CAPTURE CHANNELS")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(NativelyTheme.textTertiary)
+                
                 HStack {
                     Image(systemName: "mic.fill")
                         .foregroundColor(NativelyTheme.emeraldGreen)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text("Microphone Channel (Your Voice)")
-                            .font(.system(size: 12, weight: .medium))
-                        Text("Recorded via AVAudioEngine with real-time resampling to 16kHz mono")
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundColor(NativelyTheme.textPrimary)
+                        Text("AVAudioEngine 16kHz Mono Resampler")
                             .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(NativelyTheme.textTertiary)
                     }
+                    Spacer()
+                    Text("Active")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(NativelyTheme.emeraldGreen)
                 }
                 
-                Divider()
-                    .opacity(0.4)
+                Divider().background(NativelyTheme.borderSubtle)
                 
                 HStack {
                     Image(systemName: "speaker.wave.2.fill")
                         .foregroundColor(NativelyTheme.cyanBlue)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("System Loopback Channel (Interviewer / Participants)")
-                            .font(.system(size: 12, weight: .medium))
-                        Text("Captured via ScreenCaptureKit audio tap without requiring virtual drivers")
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("System Audio Loopback (Interviewer / Participants)")
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundColor(NativelyTheme.textPrimary)
+                        Text("ScreenCaptureKit Audio Tap (Hardware Direct)")
                             .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(NativelyTheme.textTertiary)
                     }
+                    Spacer()
+                    Text("Active")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(NativelyTheme.cyanBlue)
                 }
                 
-                Divider()
-                    .opacity(0.4)
+                Divider().background(NativelyTheme.borderSubtle)
                 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Voice Activity Detection (VAD) Sensitivity")
                             .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(NativelyTheme.textPrimary)
                         Spacer()
                         Text("\(Int(vadThreshold * 100))%")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundColor(NativelyTheme.skyAccent)
                     }
                     Slider(value: $vadThreshold, in: 0.1...0.9, step: 0.05)
                 }
             }
             .padding(14)
-            .nativeCard()
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(NativelyTheme.borderSubtle, lineWidth: 0.5)
+            )
         }
     }
     
-    // MARK: - Tab 2: Stealth & Hotkeys
+    // MARK: - Stealth Section
     
     private var stealthSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Hardware Stealth Isolation")
-                    .font(.system(size: 13, weight: .bold))
-                Text("Natively configures its floating panels at the CoreGraphics window server level to be invisible during screen sharing.")
-                    .font(.system(size: 11.5))
-                    .foregroundColor(.secondary)
-            }
-            
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 Image(systemName: "shield.checkered")
                     .font(.system(size: 26))
                     .foregroundColor(NativelyTheme.emeraldGreen)
+                
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Hardware Level Stealth Enforced")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Enforces window sharingType = .none. The overlay panel is completely invisible to ScreenCaptureKit, Zoom, Microsoft Teams, Google Meet, and QuickTime recordings.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundColor(NativelyTheme.textPrimary)
+                    Text("Configures window sharingType = .none. The overlay panel is completely invisible to ScreenCaptureKit, Zoom, Microsoft Teams, Google Meet, and QuickTime.")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(NativelyTheme.textSecondary)
                         .lineSpacing(2)
                 }
             }
-            .padding(14)
+            .padding(16)
             .background(NativelyTheme.emeraldGreen.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(NativelyTheme.emeraldGreen.opacity(0.25), lineWidth: 0.5)
             )
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Global Keyboard Shortcuts")
-                    .font(.system(size: 13, weight: .bold))
+            Toggle(isOn: $isUndetectable) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Enable Hardware Stealth")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(NativelyTheme.textPrimary)
+                    Text("When disabled, the overlay is visible in screen shares for demonstration purposes.")
+                        .font(.system(size: 11))
+                        .foregroundColor(NativelyTheme.textTertiary)
+                }
             }
-            
-            VStack(spacing: 8) {
-                shortcutRow(action: "Toggle Stealth Overlay Visibility", key: "⌘B")
-                shortcutRow(action: "Interactive Screen Crop & Vision OCR", key: "⌘⇧X")
-                shortcutRow(action: "Toggle Mouse Click Passthrough", key: "⌘⇧B")
-                shortcutRow(action: "Instant What Should I Say? (BLUF)", key: "⌘1")
-                shortcutRow(action: "Suggest Clarifying Questions", key: "⌘2")
-                shortcutRow(action: "Recap Constraints & Approaches", key: "⌘3")
-                shortcutRow(action: "Follow-up Optimization Points", key: "⌘4")
-            }
+            .toggleStyle(SwitchToggleStyle(tint: NativelyTheme.emeraldGreen))
             .padding(14)
-            .nativeCard()
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
     
-    private func shortcutRow(action: String, key: String) -> some View {
+    // MARK: - Keybinds Section
+    
+    private var keybindsSection: some View {
+        VStack(spacing: 6) {
+            keybindRow(action: "Toggle Stealth Overlay Visibility", key: "⌘B")
+            keybindRow(action: "Interactive Screen Crop & Vision OCR", key: "⌘⇧X")
+            keybindRow(action: "Toggle Mouse Click Passthrough", key: "⌘⇧B")
+            keybindRow(action: "Instant What Should I Say? (BLUF)", key: "⌘1")
+            keybindRow(action: "Suggest Clarifying Questions", key: "⌘2")
+            keybindRow(action: "Recap Constraints & Approaches", key: "⌘3")
+            keybindRow(action: "Follow-up Optimization Points", key: "⌘4")
+        }
+        .padding(14)
+        .background(NativelyTheme.bgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(NativelyTheme.borderSubtle, lineWidth: 0.5)
+        )
+    }
+    
+    private func keybindRow(action: String, key: String) -> some View {
         HStack {
             Text(action)
-                .font(.system(size: 12))
+                .font(.system(size: 12.5))
+                .foregroundColor(NativelyTheme.textSecondary)
             Spacer()
             Text(key)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundColor(.secondary)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(NativelyTheme.textPrimary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2.5)
-                .background(Color.primary.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .background(Color.white.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }
+        .padding(.vertical, 3)
     }
     
-    // MARK: - Tab 3: Companion Extension
+    // MARK: - Companion Section
     
     private var companionSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Browser Companion Server")
-                    .font(.system(size: 13, weight: .bold))
-                Text("Connects the Natively Chrome & Safari extension to capture problem descriptions, constraints, and test cases.")
-                    .font(.system(size: 11.5))
-                    .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Circle()
+                    .fill(viewModel.companionServer.isRunning ? NativelyTheme.emeraldGreen : NativelyTheme.dangerRed)
+                    .frame(width: 8, height: 8)
+                Text(viewModel.companionServer.isRunning ? "Loopback Server Active on Port \(viewModel.companionServer.port)" : "Server Stopped")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundColor(NativelyTheme.textPrimary)
+                Spacer()
+                Text("127.0.0.1")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(NativelyTheme.textTertiary)
             }
+            .padding(14)
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Extension Pairing Token")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(NativelyTheme.textPrimary)
+                
                 HStack {
-                    Circle()
-                        .fill(viewModel.companionServer.isRunning ? NativelyTheme.emeraldGreen : NativelyTheme.dangerRed)
-                        .frame(width: 8, height: 8)
-                    Text(viewModel.companionServer.isRunning ? "Loopback Server Active on Port \(viewModel.companionServer.port)" : "Server Offline")
-                        .font(.system(size: 12.5, weight: .medium))
+                    Text(viewModel.companionServer.pairingToken)
+                        .font(.system(size: 11.5, design: .monospaced))
+                        .foregroundColor(NativelyTheme.textSecondary)
+                        .lineLimit(1)
                     
                     Spacer()
                     
-                    Text("127.0.0.1")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-                
-                Divider()
-                    .opacity(0.4)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Pairing Security Token")
-                        .font(.system(size: 12, weight: .medium))
-                    
-                    HStack {
-                        Text(viewModel.companionServer.pairingToken)
-                            .font(.system(size: 11.5, design: .monospaced))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(viewModel.companionServer.pairingToken, forType: .string)
-                            isTokenCopied = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                isTokenCopied = false
-                            }
-                        }) {
-                            Label(isTokenCopied ? "Copied" : "Copy Token", systemImage: isTokenCopied ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 11.5))
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(viewModel.companionServer.pairingToken, forType: .string)
+                        isTokenCopied = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            isTokenCopied = false
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                    }) {
+                        Text(isTokenCopied ? "Copied" : "Copy Token")
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundColor(isTokenCopied ? NativelyTheme.emeraldGreen : NativelyTheme.skyAccent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
                 }
+                .padding(10)
+                .background(NativelyTheme.bgElevated)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .padding(14)
-            .nativeCard()
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
     
-    // MARK: - Tab 4: Profile Intelligence
+    // MARK: - Profile Section
     
     private var profileSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Profile Intelligence Context")
-                    .font(.system(size: 13, weight: .bold))
-                Text("Add your resume summary, tech stack, and experience. Answers will be customized to reflect your true professional identity.")
-                    .font(.system(size: 11.5))
-                    .foregroundColor(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Paste your resume, technical background, work experience, or bio below. Natively automatically injects this context so AI responses accurately reflect your true background.")
+                .font(.system(size: 12))
+                .foregroundColor(NativelyTheme.textSecondary)
+                .lineSpacing(2)
             
             TextEditor(text: $profileContext)
                 .font(.system(size: 12, design: .monospaced))
-                .frame(minHeight: 220)
+                .foregroundColor(NativelyTheme.textPrimary)
+                .frame(minHeight: 240)
                 .padding(10)
-                .background(Color(nsColor: .controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(NativelyTheme.bgCard)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color(nsColor: .separatorColor).opacity(0.8), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
                 )
+        }
+    }
+    
+    // MARK: - General & About Section
+    
+    private var generalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle(isOn: .constant(true)) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Auto-Start Recording on Meeting Join")
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundColor(NativelyTheme.textPrimary)
+                    Text("Automatically detect meeting audio and start real-time transcription.")
+                        .font(.system(size: 11))
+                        .foregroundColor(NativelyTheme.textTertiary)
+                }
+            }
+            .toggleStyle(SwitchToggleStyle(tint: NativelyTheme.skyAccent))
+            .padding(14)
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+    
+    private var aboutSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 28))
+                    .foregroundColor(NativelyTheme.purpleAccent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Natively macOS Native")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(NativelyTheme.textPrimary)
+                    Text("Version 2.7.0 (Apple Silicon Native)")
+                        .font(.system(size: 12))
+                        .foregroundColor(NativelyTheme.textTertiary)
+                }
+            }
+            .padding(16)
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 }

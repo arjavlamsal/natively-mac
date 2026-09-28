@@ -28,7 +28,7 @@ public struct MeetingDetailView: View {
             headerBar
             
             Divider()
-                .opacity(0.6)
+                .background(NativelyTheme.borderSubtle)
             
             // Native Segmented Tab Selector
             Picker("", selection: $selectedTab) {
@@ -61,7 +61,7 @@ public struct MeetingDetailView: View {
                 .padding(.vertical, 12)
             }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(NativelyTheme.bgPrimary)
         .onChange(of: meeting.id) { _, _ in
             editableTitle = meeting.title ?? "Untitled Meeting"
             viewModel.meetingChatMessages.removeAll()
@@ -72,6 +72,31 @@ public struct MeetingDetailView: View {
     
     private var headerBar: some View {
         HStack(alignment: .center) {
+            // Back Button to return to Launcher
+            Button(action: {
+                withAnimation(NativelyTheme.smoothSpring) {
+                    viewModel.selectedMeeting = nil
+                }
+            }) {
+                HStack(spacing: 5) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("Back")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(NativelyTheme.skyAccent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(NativelyTheme.skyAccent.opacity(0.12))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(NativelyTheme.skyAccent.opacity(0.25), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 4)
+            
             VStack(alignment: .leading, spacing: 5) {
                 // Title & Edit Button
                 HStack(spacing: 8) {

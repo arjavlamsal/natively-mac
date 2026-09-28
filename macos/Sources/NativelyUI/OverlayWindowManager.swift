@@ -28,8 +28,8 @@ public final class OverlayWindowManager: ObservableObject {
         }
         
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let initialWidth: CGFloat = 496
-        let initialHeight: CGFloat = 520
+        let initialWidth: CGFloat = 530
+        let initialHeight: CGFloat = 620
         let initialX = screenRect.midX - (initialWidth / 2)
         let initialY = screenRect.maxY - initialHeight - 16
         
