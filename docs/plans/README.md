@@ -30,7 +30,8 @@ flowchart TD
 | **[Phase 2 Plan](phase-2-screencapturekit-vision-cropper-plan.md)** | Sub-15ms ScreenCaptureKit screenshot, VNRecognizeTextRequest OCR on Neural Engine, interactive cropper panel with `sharingType = .none` | **Completed** (`e32be66`) | ScreenCaptureKit, Vision.framework, AppKit NSPanel |
 | **[Phase 3 Plan](phase-3-multi-cloud-streaming-ai-fallback-plan.md)** | Multi-cloud SSE streaming engine (Claude 3.5 Sonnet, GPT-4o, Gemini, Groq, DeepSeek, Ollama), TTFT 4.0s fallback ladder, and prompt compiler | **Completed** (`93bf085`) | URLSession SSE, Actor Concurrency, Circuit Breaker |
 | **[Phase 4 Plan](phase-4-stealth-overlay-markdown-math-ui-plan.md)** | Hardware stealth NSPanel (`sharingType = .none`), custom non-rectangular hit-testing, pure Swift Markdown, syntax highlighting, LaTeX math, and Carbon global hotkeys | **Completed** (`b799c31`) | NSPanel, SwiftUI, AttributedString, Carbon HIToolbox |
-| **[Phase 5 Plan](phase-5-launcher-dashboard-companion-rag-plan.md)** | Native Launcher meeting history dashboard, Network.framework companion micro-server (port 4123), and Accelerate-powered vector RAG | **Current Phase** | SwiftUI SplitView, Network.framework, Accelerate vDSP |
+| **[Phase 5 Plan](phase-5-launcher-dashboard-companion-rag-plan.md)** | Native Launcher meeting history dashboard, Network.framework companion micro-server (port 4123), and Accelerate-powered vector RAG | **Completed** (`bc87162`) | SwiftUI SplitView, Network.framework, Accelerate vDSP |
+| **[Phase 6 Plan](phase-6-hardening-packaging-notarization-plan.md)** | Application assembly, Menu Bar status item, global hotkeys, hardening, entitlements, leak profiling & packaging | **Next Phase** | NSStatusItem, Carbon/NSEvent, Sparkle, Hardened Runtime |
 
 ---
 
