@@ -7,6 +7,7 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
+        .executable(name: "NativelyMac", targets: ["NativelyApp"]),
         .library(name: "NativelyCore", targets: ["NativelyCore"]),
         .library(name: "NativelySecurity", targets: ["NativelySecurity"]),
         .library(name: "NativelyDatabase", targets: ["NativelyDatabase"]),
@@ -96,6 +97,21 @@ let package = Package(
                 "NativelyRAG",
             ],
             path: "Sources/NativelyUI"
+        ),
+        .executableTarget(
+            name: "NativelyApp",
+            dependencies: [
+                "NativelyCore",
+                "NativelySecurity",
+                "NativelyDatabase",
+                "NativelyAudio",
+                "NativelyVision",
+                "NativelyAI",
+                "NativelyCompanion",
+                "NativelyRAG",
+                "NativelyUI",
+            ],
+            path: "Sources/NativelyApp"
         ),
         .testTarget(
             name: "NativelyCoreTests",

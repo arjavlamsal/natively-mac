@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.natively.mac</string>
+    <key>CFBundleName</key>
+    <string>Natively</string>
+    <key>CFBundleDisplayName</key>
+    <string>Natively</string>
+    <key>CFBundleExecutable</key>
+    <string>NativelyMac</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>200</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Natively requires microphone access for real-time speech-to-text during meetings and interviews.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Natively uses screen capture for instant code OCR and region analysis.</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Natively uses local network to pair with the Natively Chrome extension and companion devices.</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

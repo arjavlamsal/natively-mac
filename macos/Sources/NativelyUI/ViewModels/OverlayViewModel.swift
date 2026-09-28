@@ -81,6 +81,12 @@ public final class OverlayViewModel: ObservableObject {
         }
     }
     
+    /// Selects and persists the active AI mode.
+    public func selectMode(_ mode: Mode) {
+        self.activeMode = mode
+        try? database.setActiveMode(id: mode.id)
+    }
+    
     /// Ingests a new live transcript turn from the audio pipeline.
     public func appendTranscript(channel: AudioChannel, text: String) {
         appendTranscript(speaker: channel.defaultSpeakerLabel, text: text)
