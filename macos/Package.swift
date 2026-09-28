@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "NativelySecurity", targets: ["NativelySecurity"]),
         .library(name: "NativelyDatabase", targets: ["NativelyDatabase"]),
         .library(name: "NativelyAudio", targets: ["NativelyAudio"]),
+        .library(name: "NativelyVision", targets: ["NativelyVision"]),
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
@@ -44,6 +45,14 @@ let package = Package(
             ],
             path: "Sources/NativelyAudio"
         ),
+        .target(
+            name: "NativelyVision",
+            dependencies: [
+                "NativelyCore",
+                "NativelyDatabase"
+            ],
+            path: "Sources/NativelyVision"
+        ),
         .testTarget(
             name: "NativelyCoreTests",
             dependencies: ["NativelyCore"],
@@ -63,6 +72,11 @@ let package = Package(
             name: "NativelyAudioTests",
             dependencies: ["NativelyAudio"],
             path: "Tests/NativelyAudioTests"
+        ),
+        .testTarget(
+            name: "NativelyVisionTests",
+            dependencies: ["NativelyVision"],
+            path: "Tests/NativelyVisionTests"
         )
     ]
 )
