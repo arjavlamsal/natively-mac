@@ -34,6 +34,14 @@ public final class AppDatabase: Sendable {
         return try AppDatabase(dbQueue)
     }
 
+    public static let shared: AppDatabase = {
+        do {
+            return try AppDatabase.open()
+        } catch {
+            return try! AppDatabase.makeInMemory()
+        }
+    }()
+
     private var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
