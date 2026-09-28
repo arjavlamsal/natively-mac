@@ -182,6 +182,12 @@ public final class AppDatabase: Sendable {
         }
     }
 
+    public func fetchMode(id: String) throws -> Mode? {
+        try dbWriter.read { db in
+            try ModeRecord.filter(Column("id") == id).fetchOne(db)?.toMode()
+        }
+    }
+
     public func fetchActiveMode() throws -> Mode? {
         try dbWriter.read { db in
             try ModeRecord.filter(Column("is_active") == 1).fetchOne(db)?.toMode()

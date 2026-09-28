@@ -80,7 +80,6 @@ public final class VisionOCRService: Sendable {
             }
             
             request.recognitionLevel = (mode == .accurate) ? .accurate : .fast
-            request.usesCPUOnly = false // Utilize Apple Neural Engine and Apple GPU
             request.recognitionLanguages = languages
             request.automaticallyDetectsLanguage = true
             

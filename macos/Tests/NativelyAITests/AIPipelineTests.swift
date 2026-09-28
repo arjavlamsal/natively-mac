@@ -1,0 +1,238 @@
+import Testing
+import Foundation
+import CoreGraphics
+@testable import NativelyCore
+@testable import NativelyDatabase
+@testable import NativelySecurity
+@testable import NativelyVision
+@testable import NativelyAI
+
+/// Mock streaming provider for deterministic testing of fallback ladder and timeouts
+final class MockStreamingProvider: StreamingAIProvider, @unchecked Sendable {
+    let providerType: AIProviderType
+    let chunks: [String]
+    let delayBeforeFirstChunk: TimeInterval
+    let shouldFail: Bool
+    let failureError: Error
+    
+    init(
+        providerType: AIProviderType,
+        chunks: [String] = ["Hello", " ", "World"],
+        delayBeforeFirstChunk: TimeInterval = 0.0,
+        shouldFail: Bool = false,
+        failureError: Error = AIClientError.httpError(statusCode: 500, body: "Server Overloaded")
+    ) {
+        self.providerType = providerType
+        self.chunks = chunks
+        self.delayBeforeFirstChunk = delayBeforeFirstChunk
+        self.shouldFail = shouldFail
+        self.failureError = failureError
+    }
+    
+    func stream(request: AIRequest, apiKey: String?) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                if delayBeforeFirstChunk > 0 {
+                    try? await Task.sleep(nanoseconds: UInt64(delayBeforeFirstChunk * 1_000_000_000))
+                }
+                
+                if shouldFail {
+                    continuation.finish(throwing: failureError)
+                    return
+                }
+                
+                for chunk in chunks {
+                    continuation.yield(chunk)
+                }
+                continuation.finish()
+            }
+        }
+    }
+}
+
+@Suite("NativelyAI Pipeline Tests")
+struct AIPipelineTests {
+    
+    @Test("SSEParser correctly extracts events and payloads")
+    func testSSEParser() async throws {
+        let rawSSELines = [
+            "event: message",
+            "data: {\"type\": \"content_block_delta\", \"delta\": {\"text\": \"Native\"}}",
+            "",
+            "data: {\"type\": \"content_block_delta\", \"delta\": {\"text\": \" Swift\"}}",
+            "",
+            "data: [DONE]"
+        ]
+        
+        var parser = SSEParser()
+        var events: [SSEEvent] = []
+        for line in rawSSELines {
+            if let evt = parser.feed(line: line) {
+                events.append(evt)
+            }
+        }
+        if let trailing = parser.finish() {
+            events.append(trailing)
+        }
+        
+        #expect(events.count == 3)
+        #expect(events[0].event == "message")
+        #expect(events[0].data.contains("Native"))
+        #expect(events[1].data.contains("Swift"))
+        #expect(events[2].data == "[DONE]")
+    }
+    
+    @Test("ModePromptBuilder generates targeted system prompts with screen OCR")
+    func testModePromptBuilder() {
+        let ocrResult = OCRResult(fullText: "class Solution { func twoSum() }")
+        let dummyImage = CGContext(data: nil, width: 10, height: 10, bitsPerComponent: 8, bytesPerRow: 40, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!.makeImage()!
+        let screenContext = ScreenContext(
+            cgImage: dummyImage,
+            pngData: Data(),
+            base64DataUrl: "data:image/png;base64,",
+            ocrResult: ocrResult,
+            bounds: .zero,
+            imageHash: "hash"
+        )
+        
+        let technicalPrompt = ModePromptBuilder.buildSystemPrompt(modeId: "technical", screenContext: screenContext)
+        #expect(technicalPrompt.contains("technical interview copilot"))
+        #expect(technicalPrompt.contains("Time Complexity"))
+        #expect(technicalPrompt.contains("twoSum()"))
+        
+        let negotiationPrompt = ModePromptBuilder.buildSystemPrompt(modeId: "negotiation")
+        #expect(negotiationPrompt.contains("negotiation coach"))
+        #expect(negotiationPrompt.contains("tactical empathy"))
+    }
+    
+    @Test("FallbackLadderEngine switches to fallback provider on primary failure")
+    func testFallbackOnFailure() async throws {
+        let engine = FallbackLadderEngine()
+        
+        // Primary fails with 500 error
+        let failingPrimary = MockStreamingProvider(
+            providerType: .anthropic,
+            shouldFail: true,
+            failureError: AIClientError.httpError(statusCode: 500, body: "Anthropic Outage")
+        )
+        
+        // Fallback succeeds
+        let successfulFallback = MockStreamingProvider(
+            providerType: .openAI,
+            chunks: ["Fallback", " ", "Succeeded"]
+        )
+        
+        let ladder = [
+            FallbackRung(providerType: .anthropic, ttftTimeoutSeconds: 2.0),
+            FallbackRung(providerType: .openAI, ttftTimeoutSeconds: 2.0)
+        ]
+        
+        let result = try await engine.executeStream(
+            ladder: ladder,
+            clientResolver: { provider in
+                if provider == .anthropic { return failingPrimary }
+                if provider == .openAI { return successfulFallback }
+                return nil
+            },
+            keyResolver: { _ in "mock-key" },
+            baseRequest: { model in AIRequest(model: model, messages: []) }
+        )
+        
+        #expect(result.providerUsed == .openAI)
+        
+        var output = ""
+        for try await chunk in result.stream {
+            output += chunk
+        }
+        #expect(output == "Fallback Succeeded")
+    }
+    
+    @Test("FallbackLadderEngine watchdog triggers failover on TTFT timeout")
+    func testFallbackOnTTFTTimeout() async throws {
+        let engine = FallbackLadderEngine()
+        
+        // Slow primary takes 0.5s, but budget is 0.1s
+        let slowPrimary = MockStreamingProvider(
+            providerType: .anthropic,
+            chunks: ["Too Late"],
+            delayBeforeFirstChunk: 0.5
+        )
+        
+        // Fast fallback delivers immediately
+        let fastFallback = MockStreamingProvider(
+            providerType: .groq,
+            chunks: ["Fast", " ", "Groq"]
+        )
+        
+        let ladder = [
+            FallbackRung(providerType: .anthropic, ttftTimeoutSeconds: 0.1),
+            FallbackRung(providerType: .groq, ttftTimeoutSeconds: 1.0)
+        ]
+        
+        let result = try await engine.executeStream(
+            ladder: ladder,
+            clientResolver: { provider in
+                if provider == .anthropic { return slowPrimary }
+                if provider == .groq { return fastFallback }
+                return nil
+            },
+            keyResolver: { _ in "mock-key" },
+            baseRequest: { model in AIRequest(model: model, messages: []) }
+        )
+        
+        #expect(result.providerUsed == .groq)
+        
+        var output = ""
+        for try await chunk in result.stream {
+            output += chunk
+        }
+        #expect(output == "Fast Groq")
+    }
+    
+    @Test("TurnPlannerActor end-to-end question answering and persistence")
+    func testTurnPlannerEndToEnd() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let meetingId = "m-ai-test"
+        try db.saveMeeting(Meeting(id: meetingId, title: "AI Test Meeting"))
+        
+        let mockClient = MockStreamingProvider(
+            providerType: .openAI,
+            chunks: ["Optimized ", "O(N) ", "solution"]
+        )
+        
+        let customClients: [AIProviderType: StreamingAIProvider] = [
+            .openAI: mockClient
+        ]
+        
+        let testKeychain = KeychainManager(service: "test.planner.\(UUID().uuidString)")
+        try await testKeychain.save(key: "openai_api_key", value: "sk-mock-test-key")
+        
+        let planner = TurnPlannerActor(
+            database: db,
+            keychain: testKeychain,
+            customClients: customClients
+        )
+        
+        let ladder = [FallbackRung(providerType: .openAI, ttftTimeoutSeconds: 2.0)]
+        let result = try await planner.generateAnswer(
+            question: "How to solve Two Sum?",
+            meetingId: meetingId,
+            modeId: "technical",
+            customLadder: ladder
+        )
+        
+        var answer = ""
+        for try await chunk in result.stream {
+            answer += chunk
+        }
+        
+        #expect(answer == "Optimized O(N) solution")
+        
+        // Verify interaction was saved to database
+        let savedInteractions = try db.fetchAIInteractions(for: meetingId)
+        #expect(savedInteractions.count == 1)
+        #expect(savedInteractions[0].userQuery == "How to solve Two Sum?")
+        #expect(savedInteractions[0].aiResponse == "Optimized O(N) solution")
+        #expect(savedInteractions[0].type == "answer")
+    }
+}
