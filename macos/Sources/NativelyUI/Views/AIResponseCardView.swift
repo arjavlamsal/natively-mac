@@ -2,9 +2,9 @@ import SwiftUI
 import AppKit
 import NativelyCore
 
-/// Multi-turn conversation view rendering user queries, quick-action chips,
-/// attached screenshot thumbnails, and streaming AI assistant cards with Markdown,
-/// syntax-highlighted code blocks, and LaTeX math.
+/// Multi-turn conversation view adhering to macOS Human Interface Guidelines.
+/// Renders user queries with thumbnail attachments, quick-action chips, and streaming
+/// AI cards with native Markdown, syntax-highlighted code blocks, and LaTeX math.
 public struct AIResponseCardView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     
@@ -28,7 +28,7 @@ public struct AIResponseCardView: View {
                                 }
                             }
                             
-                            // Shimmering "Thinking..." indicator
+                            // Animated thinking indicator
                             if viewModel.isAIStreaming && (viewModel.messages.last?.text.isEmpty ?? true) {
                                 thinkingIndicator
                             }
@@ -42,7 +42,7 @@ public struct AIResponseCardView: View {
                     }
                     .frame(maxHeight: 340)
                     .onChange(of: viewModel.messages.count) { _, _ in
-                        withAnimation {
+                        withAnimation(NativelyTheme.smoothSpring) {
                             proxy.scrollTo("bottom-anchor", anchor: .bottom)
                         }
                     }
@@ -55,77 +55,83 @@ public struct AIResponseCardView: View {
     }
     
     // MARK: - User Message Row
+    
     private func userMessageRow(msg: OverlayMessage) -> some View {
         HStack {
-            Spacer()
+            Spacer(minLength: 40)
+            
             VStack(alignment: .trailing, spacing: 4) {
-                // If screenshot attached, display thumbnail preview
+                // Screenshot thumbnail preview if present
                 if let preview = msg.screenshotPreview, let img = NSImage(base64Encoding: preview) {
                     Image(nsImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(maxHeight: 60)
-                        .cornerRadius(6)
+                        .frame(maxHeight: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
                         )
                 }
                 
                 HStack(spacing: 5) {
                     if msg.isQuickActionLabel {
                         Image(systemName: quickActionIcon(for: msg.actionKind))
-                            .font(.system(size: 9))
-                            .foregroundColor(.purple)
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.white.opacity(0.85))
                     }
                     
                     Text(msg.text)
-                        .font(.system(size: 11.5, weight: .medium))
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 11)
                 .padding(.vertical, 6)
-                .background(Color.purple.opacity(0.25))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.purple.opacity(0.4), lineWidth: 1)
+                .background(
+                    LinearGradient(
+                        colors: [NativelyTheme.purpleAccent, NativelyTheme.purpleAccent.opacity(0.85)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: NativelyTheme.purpleAccent.opacity(0.3), radius: 6, y: 2)
             }
         }
     }
     
     // MARK: - Assistant Message Card
+    
     private func assistantMessageCard(msg: OverlayMessage) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             // Header Bar
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.purple)
+                    .foregroundColor(NativelyTheme.purpleAccent)
                 
                 Text(msg.modelName ?? viewModel.currentProviderName)
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundColor(Color.white.opacity(0.85))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
                 
                 if let latency = msg.latencyMs {
                     Text("⚡ \(Int(latency))ms TTFT")
                         .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(Color(red: 0.4, green: 0.9, blue: 0.6))
+                        .foregroundColor(NativelyTheme.emeraldGreen)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1.5)
-                        .background(Color.green.opacity(0.12))
-                        .cornerRadius(3)
+                        .background(NativelyTheme.emeraldGreen.opacity(0.14))
+                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                 }
                 
                 if msg.isStreaming {
                     HStack(spacing: 3) {
                         Circle()
-                            .fill(Color.purple)
-                            .frame(width: 4, height: 4)
+                            .fill(NativelyTheme.purpleAccent)
+                            .frame(width: 4.5, height: 4.5)
                         Text("Streaming")
                             .font(.system(size: 8.5, weight: .medium))
-                            .foregroundColor(.purple)
+                            .foregroundColor(NativelyTheme.purpleAccent)
                     }
                 }
                 
@@ -137,47 +143,50 @@ public struct AIResponseCardView: View {
             .padding(.horizontal, 4)
             .padding(.top, 2)
             
-            Divider().background(Color.white.opacity(0.08))
+            Divider()
+                .opacity(0.2)
             
-            // Markdown Content
+            // Markdown / Code Content
             if !msg.text.isEmpty {
                 NativeMarkdownView(msg.text)
                     .padding(.vertical, 2)
             }
         }
-        .padding(10)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.85))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
         )
     }
     
-    // MARK: - Thinking Shimmer Indicator
+    // MARK: - Thinking Indicator
+    
     private var thinkingIndicator: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 7) {
             ProgressView()
                 .scaleEffect(0.6)
                 .colorInvert()
             Text("Thinking...")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.6))
+                .foregroundColor(.white.opacity(0.7))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(10)
+        .background(Color.white.opacity(0.06))
+        .clipShape(Capsule())
     }
     
     // MARK: - Empty State View
+    
     private var emptyStatePresetView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("SUGGESTED ACTIONS")
                 .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                .foregroundColor(Color.white.opacity(0.45))
+                .foregroundColor(.white.opacity(0.45))
                 .padding(.horizontal, 4)
             
             HStack(spacing: 6) {
@@ -206,20 +215,20 @@ public struct AIResponseCardView: View {
                     .font(.system(size: 10.5, weight: .medium))
                 Text(shortcut)
                     .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.5))
+                    .foregroundColor(.white.opacity(0.5))
                     .padding(.horizontal, 3.5)
                     .padding(.vertical, 1)
                     .background(Color.white.opacity(0.08))
-                    .cornerRadius(3)
+                    .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
             }
-            .foregroundColor(Color.white.opacity(0.85))
+            .foregroundColor(.white.opacity(0.85))
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .background(Color.white.opacity(0.06))
-            .cornerRadius(8)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
@@ -258,11 +267,11 @@ private struct CopyAnswerButton: View {
                 Text(isCopied ? "Copied" : "Copy")
                     .font(.system(size: 9, weight: .medium))
             }
-            .foregroundColor(isCopied ? Color.green : Color.white.opacity(0.55))
+            .foregroundColor(isCopied ? NativelyTheme.emeraldGreen : .white.opacity(0.6))
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
-            .background(isCopied ? Color.green.opacity(0.12) : Color.white.opacity(0.06))
-            .cornerRadius(4)
+            .background(isCopied ? NativelyTheme.emeraldGreen.opacity(0.14) : Color.white.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }
         .buttonStyle(.plain)
         .help("Copy full answer")

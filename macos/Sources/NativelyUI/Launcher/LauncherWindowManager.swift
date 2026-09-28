@@ -3,7 +3,7 @@ import SwiftUI
 import NativelyDatabase
 import NativelyCompanion
 
-/// Window manager for the standard native macOS Launcher dashboard window.
+/// Window manager for the standard native macOS Launcher dashboard window adhering to macOS HIG.
 @MainActor
 public final class LauncherWindowManager: ObservableObject {
     public static let shared = LauncherWindowManager()
@@ -24,8 +24,8 @@ public final class LauncherWindowManager: ObservableObject {
         }
         
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let width: CGFloat = 860
-        let height: CGFloat = 580
+        let width: CGFloat = 880
+        let height: CGFloat = 600
         let originX = screenRect.midX - (width / 2)
         let originY = screenRect.midY - (height / 2)
         
@@ -39,8 +39,9 @@ public final class LauncherWindowManager: ObservableObject {
         
         newWindow.title = "Natively"
         newWindow.titlebarAppearsTransparent = true
-        newWindow.titleVisibility = .hidden
-        newWindow.minSize = NSSize(width: 750, height: 480)
+        newWindow.toolbarStyle = .unified
+        newWindow.titleVisibility = .visible
+        newWindow.minSize = NSSize(width: 780, height: 500)
         newWindow.isReleasedWhenClosed = false
         
         let hostingView = NSHostingView(rootView: LauncherDashboardView(viewModel: viewModel))

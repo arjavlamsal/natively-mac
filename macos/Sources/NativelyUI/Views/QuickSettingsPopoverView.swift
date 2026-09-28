@@ -1,7 +1,7 @@
 import SwiftUI
 import NativelyCore
 
-/// Fast popup settings matching Natively's quick settings popover in the overlay.
+/// Fast popup settings adhering to macOS HIG with native toggles and keybindings.
 public struct QuickSettingsPopoverView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     @AppStorage("natively_undetectable") private var isUndetectable: Bool = true
@@ -16,7 +16,7 @@ public struct QuickSettingsPopoverView: View {
             // Header
             Text("QUICK CONTROLS")
                 .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                .foregroundColor(Color.white.opacity(0.45))
+                .foregroundColor(.secondary)
                 .padding(.horizontal, 4)
             
             // 1. Undetectability / Stealth Toggle
@@ -24,84 +24,84 @@ public struct QuickSettingsPopoverView: View {
                 HStack(spacing: 8) {
                     Image(systemName: isUndetectable ? "eye.slash.fill" : "eye.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(isUndetectable ? Color.green : Color.white.opacity(0.6))
+                        .foregroundColor(isUndetectable ? NativelyTheme.emeraldGreen : .secondary)
                         .frame(width: 16)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(isUndetectable ? "Undetectable" : "Detectable")
                             .font(.system(size: 11.5, weight: .medium))
-                            .foregroundColor(.white)
                         Text(isUndetectable ? "Invisible to screen share" : "Visible in captures")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color.white.opacity(0.5))
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
                     }
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: .green))
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
+                .opacity(0.4)
             
-            // 2. Fast Response Mode (Groq Llama 3.3)
+            // 2. Fast Response Mode
             Toggle(isOn: $isFastResponse) {
                 HStack(spacing: 8) {
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(Color.yellow)
+                        .foregroundColor(NativelyTheme.warningAmber)
                         .frame(width: 16)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Fast Response")
                             .font(.system(size: 11.5, weight: .medium))
-                            .foregroundColor(.white)
                         Text("Ultra-low latency streaming")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color.white.opacity(0.5))
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
                     }
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: .yellow))
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
+                .opacity(0.4)
             
             // 3. Rolling Transcript Display
             Toggle(isOn: $viewModel.showRollingTranscript) {
                 HStack(spacing: 8) {
                     Image(systemName: "waveform")
                         .font(.system(size: 12))
-                        .foregroundColor(Color.cyan)
+                        .foregroundColor(NativelyTheme.cyanBlue)
                         .frame(width: 16)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Rolling Transcript")
                             .font(.system(size: 11.5, weight: .medium))
-                            .foregroundColor(.white)
                         Text("Show live conversation stream")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color.white.opacity(0.5))
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
                     }
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: .cyan))
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
+                .opacity(0.4)
             
             // 4. Direct Assist Toggle
             Toggle(isOn: $viewModel.isDirectAssist) {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 12))
-                        .foregroundColor(Color.purple)
+                        .foregroundColor(NativelyTheme.purpleAccent)
                         .frame(width: 16)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Direct Assist")
                             .font(.system(size: 11.5, weight: .medium))
-                            .foregroundColor(.white)
                         Text("Bypass turn planner routing")
-                            .font(.system(size: 9))
-                            .foregroundColor(Color.white.opacity(0.5))
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
                     }
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: .purple))
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
+                .opacity(0.4)
             
             // 5. Shortcuts Cheat Sheet
             VStack(alignment: .leading, spacing: 5) {
@@ -113,7 +113,8 @@ public struct QuickSettingsPopoverView: View {
             }
             .padding(.vertical, 2)
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider()
+                .opacity(0.4)
             
             // 6. Open Full Settings Button
             Button(action: {
@@ -129,29 +130,29 @@ public struct QuickSettingsPopoverView: View {
                     Image(systemName: "arrow.up.right")
                         .font(.system(size: 9))
                 }
-                .foregroundColor(Color.white.opacity(0.85))
+                .foregroundColor(.secondary)
                 .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
         }
         .padding(14)
         .frame(width: 230)
-        .background(Color(red: 0.11, green: 0.13, blue: 0.17))
+        .background(Color(nsColor: .windowBackgroundColor))
     }
     
     private func shortcutRow(key: String, label: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 10))
-                .foregroundColor(Color.white.opacity(0.65))
+                .font(.system(size: 10.5))
+                .foregroundColor(.secondary)
             Spacer()
             Text(key)
                 .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white)
+                .foregroundColor(.secondary)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1.5)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(4)
+                .background(Color.primary.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }
     }
 }

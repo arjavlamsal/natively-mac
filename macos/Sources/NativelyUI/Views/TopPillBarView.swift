@@ -1,9 +1,9 @@
 import SwiftUI
 import NativelyCore
 
-/// Sleek liquid glass top control pill matching Natively's floating top bar.
-/// Houses the brand mark, show/hide toggle, live audio meters, active mode dropdown,
-/// stealth status, crop trigger, and the red stop/end-meeting button.
+/// Premium liquid glass top control pill adhering to macOS Human Interface Guidelines.
+/// Houses the brand mark, show/hide toggle, live dynamic RMS meters, active mode dropdown,
+/// stealth status, vision snip trigger, mouse passthrough, model selector, settings, and end-meeting action.
 public struct TopPillBarView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     public var onCropTrigger: () -> Void = {}
@@ -15,29 +15,29 @@ public struct TopPillBarView: View {
     
     public var body: some View {
         HStack(spacing: 8) {
-            // 1. BRAND LOGO BUTTON (Opens Launcher)
+            // 1. BRAND BUTTON (Opens Launcher Dashboard)
             Button(action: {
                 viewModel.onOpenLauncher?()
             }) {
                 HStack(spacing: 5) {
-                    Image(systemName: "sparkle")
+                    Image(systemName: "sparkles")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.purple)
+                        .foregroundColor(NativelyTheme.purpleAccent)
                     Text("Natively")
-                        .font(.system(size: 11.5, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
                 }
                 .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.vertical, 4.5)
                 .background(Color.white.opacity(0.08))
-                .cornerRadius(12)
+                .clipShape(Capsule())
             }
             .buttonStyle(.plain)
             .help("Open Natively Dashboard")
             
-            // 2. SHOW / HIDE TOGGLE (Cmd+B)
+            // 2. SHOW / HIDE TOGGLE (⌘B)
             Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+                withAnimation(NativelyTheme.smoothSpring) {
                     viewModel.isExpanded.toggle()
                 }
             }) {
@@ -47,14 +47,14 @@ public struct TopPillBarView: View {
                     Text(viewModel.isExpanded ? "Hide" : "Show")
                         .font(.system(size: 11, weight: .medium))
                 }
-                .foregroundColor(Color.white.opacity(0.9))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(Color.white.opacity(0.10))
-                .cornerRadius(12)
+                .foregroundColor(.white.opacity(0.9))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4.5)
+                .background(Color.white.opacity(0.08))
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    Capsule()
+                        .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
                 )
             }
             .buttonStyle(.plain)
@@ -62,28 +62,31 @@ public struct TopPillBarView: View {
             
             Divider()
                 .frame(height: 12)
-                .background(Color.white.opacity(0.15))
+                .opacity(0.3)
             
-            // 3. AUDIO ENGINE ACTIVITY METERS
-            HStack(spacing: 4) {
+            // 3. DYNAMIC STEREO AUDIO METERS
+            HStack(spacing: 3.5) {
                 Circle()
-                    .fill(viewModel.isAudioActive ? Color.green : Color.white.opacity(0.3))
+                    .fill(viewModel.isAudioActive ? NativelyTheme.emeraldGreen : Color.white.opacity(0.25))
                     .frame(width: 6, height: 6)
-                    .shadow(color: viewModel.isAudioActive ? Color.green.opacity(0.8) : .clear, radius: 4)
+                    .shadow(color: viewModel.isAudioActive ? NativelyTheme.emeraldGreen.opacity(0.8) : .clear, radius: 4)
                 
-                // Mic RMS level mini-bar
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.green.opacity(0.85))
-                    .frame(width: 2.5, height: max(4, CGFloat(viewModel.micRMS * 14)))
+                // Mic level bar
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(NativelyTheme.emeraldGreen.opacity(0.9))
+                    .frame(width: 3, height: max(4, CGFloat(viewModel.micRMS * 16)))
+                    .animation(.spring(response: 0.15, dampingFraction: 0.7), value: viewModel.micRMS)
                 
-                // System audio RMS level mini-bar
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.cyan.opacity(0.85))
-                    .frame(width: 2.5, height: max(4, CGFloat(viewModel.systemRMS * 14)))
+                // System audio level bar
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(NativelyTheme.cyanBlue.opacity(0.9))
+                    .frame(width: 3, height: max(4, CGFloat(viewModel.systemRMS * 16)))
+                    .animation(.spring(response: 0.15, dampingFraction: 0.7), value: viewModel.systemRMS)
             }
-            .help("Audio Engine: Mic (Green) & System Loopback (Cyan)")
+            .padding(.horizontal, 4)
+            .help("Live Audio: Mic (Green) & System Loopback (Cyan)")
             
-            // 4. ACTIVE MODE DROPDOWN PILL
+            // 4. ACTIVE MODE MENU
             Menu {
                 ForEach(viewModel.availableModes) { mode in
                     Button(action: {
@@ -101,54 +104,54 @@ public struct TopPillBarView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "waveform.path.ecg")
                         .font(.system(size: 10))
-                        .foregroundColor(Color.cyan)
+                        .foregroundColor(NativelyTheme.cyanBlue)
                     Text(viewModel.activeMode.name)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.9))
+                        .foregroundColor(.white.opacity(0.9))
                     Image(systemName: "chevron.down")
                         .font(.system(size: 7, weight: .bold))
-                        .foregroundColor(Color.white.opacity(0.5))
+                        .foregroundColor(.white.opacity(0.5))
                 }
                 .padding(.horizontal, 7)
-                .padding(.vertical, 3.5)
+                .padding(.vertical, 4)
                 .background(Color.white.opacity(0.08))
-                .cornerRadius(10)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .menuStyle(.borderlessButton)
             
-            // 5. HARDWARE STEALTH SHIELD
+            // 5. HARDWARE STEALTH BADGE
             HStack(spacing: 3) {
                 Image(systemName: "shield.lefthalf.filled.badge.checkmark")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color(red: 0.4, green: 0.9, blue: 0.6))
+                    .font(.system(size: 9.5))
+                    .foregroundColor(NativelyTheme.emeraldGreen)
                 Text("STEALTH")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.7))
+                    .foregroundColor(.white.opacity(0.75))
             }
             .padding(.horizontal, 6)
-            .padding(.vertical, 2.5)
-            .background(Color(red: 0.1, green: 0.3, blue: 0.2).opacity(0.4))
-            .cornerRadius(4)
+            .padding(.vertical, 3)
+            .background(NativelyTheme.emeraldGreen.opacity(0.16))
+            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             .help("Hardware Stealth: sharingType = .none (Completely invisible to Zoom, Teams, Meet)")
             
             Spacer()
             
-            // 6. SCREEN CROP SHORTCUT (Cmd+Shift+X)
+            // 6. SCREEN CROP SHORTCUT (⌘⇧X)
             Button(action: {
                 onCropTrigger()
                 viewModel.onCropTrigger?()
             }) {
                 Image(systemName: "crop")
                     .font(.system(size: 11))
-                    .foregroundColor(viewModel.attachedOCRSnippet != nil ? Color.yellow : Color.white.opacity(0.75))
-                    .padding(5)
-                    .background(viewModel.attachedOCRSnippet != nil ? Color.yellow.opacity(0.18) : Color.white.opacity(0.08))
+                    .foregroundColor(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber : .white.opacity(0.8))
+                    .padding(5.5)
+                    .background(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.08))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .help("Crop Screen Region & OCR (⌘⇧X)")
+            .help("Crop Screen Region & Vision OCR (⌘⇧X)")
             
-            // 7. MOUSE PASSTHROUGH TOGGLE (Cmd+Shift+B)
+            // 7. MOUSE PASSTHROUGH TOGGLE (⌘⇧B)
             Button(action: {
                 withAnimation(.spring(response: 0.25)) {
                     viewModel.isPassthrough.toggle()
@@ -156,24 +159,67 @@ public struct TopPillBarView: View {
             }) {
                 Image(systemName: viewModel.isPassthrough ? "hand.point.up.braille" : "cursorarrow.rays")
                     .font(.system(size: 11))
-                    .foregroundColor(viewModel.isPassthrough ? Color.orange : Color.white.opacity(0.7))
-                    .padding(5)
-                    .background(viewModel.isPassthrough ? Color.orange.opacity(0.2) : Color.white.opacity(0.08))
+                    .foregroundColor(viewModel.isPassthrough ? NativelyTheme.warningAmber : .white.opacity(0.75))
+                    .padding(5.5)
+                    .background(viewModel.isPassthrough ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.08))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
             .help("Toggle Mouse Passthrough (⌘⇧B)")
             
-            // 8. END MEETING / STOP BUTTON
+            // 8. MODEL SELECTOR POPOVER TRIGGER
+            Button(action: {
+                viewModel.isModelSelectorPresented.toggle()
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 10.5))
+                    Text(viewModel.currentModel.name)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .lineLimit(1)
+                }
+                .foregroundColor(.white.opacity(0.85))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.08))
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $viewModel.isModelSelectorPresented, arrowEdge: .bottom) {
+                ModelSelectorPopoverView(viewModel: viewModel)
+            }
+            .help("Switch Active AI Model")
+            
+            // 9. QUICK SETTINGS POPOVER TRIGGER
+            Button(action: {
+                viewModel.isQuickSettingsPresented.toggle()
+            }) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(5.5)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $viewModel.isQuickSettingsPresented, arrowEdge: .bottom) {
+                QuickSettingsPopoverView(viewModel: viewModel)
+            }
+            .help("Quick Settings & Shortcuts")
+            
+            // 10. RED END MEETING BUTTON
             Button(action: {
                 viewModel.onEndMeeting?()
             }) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.red.opacity(0.85))
-                    .frame(width: 10, height: 10)
-                    .padding(6)
-                    .background(Color.red.opacity(0.18))
-                    .clipShape(Circle())
+                ZStack {
+                    Circle()
+                        .fill(NativelyTheme.dangerRed.opacity(0.2))
+                        .frame(width: 22, height: 22)
+                    
+                    RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                        .fill(NativelyTheme.dangerRed)
+                        .frame(width: 9, height: 9)
+                }
             }
             .buttonStyle(.plain)
             .help("Stop & End Session (Save Notes & Summary)")
@@ -181,14 +227,13 @@ public struct TopPillBarView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.10, green: 0.12, blue: 0.16).opacity(0.92))
-                .background(.ultraThinMaterial)
+            NativelyTheme.VisualEffectBackground(material: .hudWindow, blendingMode: .withinWindow)
         )
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(NativelyTheme.glowStroke, lineWidth: 0.5)
         )
-        .shadow(color: Color.black.opacity(0.35), radius: 8, y: 3)
+        .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 6)
     }
 }

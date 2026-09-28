@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-/// A native syntax-highlighted code block with line numbers and a 1-click Copy button.
+/// A native syntax-highlighted code block with line numbers and a 1-click Copy button adhering to macOS HIG.
 public struct SyntaxHighlightedCodeBlockView: View {
     public let language: String
     public let code: String
@@ -20,21 +20,21 @@ public struct SyntaxHighlightedCodeBlockView: View {
             // Header Bar
             HStack {
                 Text(language.isEmpty ? "CODE" : language.uppercased())
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.6))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2.5)
                     .background(Color.white.opacity(0.08))
-                    .cornerRadius(4)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 
                 if !isComplete {
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(Color.orange)
-                            .frame(width: 6, height: 6)
+                            .fill(NativelyTheme.warningAmber)
+                            .frame(width: 5, height: 5)
                         Text("generating...")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.orange)
+                            .foregroundColor(NativelyTheme.warningAmber)
                     }
                 }
                 
@@ -43,24 +43,24 @@ public struct SyntaxHighlightedCodeBlockView: View {
                 Button(action: copyToClipboard) {
                     HStack(spacing: 4) {
                         Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
-                            .font(.system(size: 10))
+                            .font(.system(size: 9.5))
                         Text(isCopied ? "Copied" : "Copy")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 10.5, weight: .medium))
                     }
-                    .foregroundColor(isCopied ? .green : Color.white.opacity(0.8))
-                    .padding(.horizontal, 8)
+                    .foregroundColor(isCopied ? NativelyTheme.emeraldGreen : .white.opacity(0.8))
+                    .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Color.white.opacity(0.1))
-                    .cornerRadius(5)
+                    .background(isCopied ? NativelyTheme.emeraldGreen.opacity(0.14) : Color.white.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.black.opacity(0.4))
+            .background(Color.black.opacity(0.35))
             
             Divider()
-                .background(Color.white.opacity(0.1))
+                .opacity(0.15)
             
             // Code Body with Line Numbers
             ScrollView(.horizontal, showsIndicators: true) {
@@ -71,7 +71,7 @@ public struct SyntaxHighlightedCodeBlockView: View {
                         ForEach(0..<lines.count, id: \.self) { idx in
                             Text("\(idx + 1)")
                                 .font(.system(size: 11.5, design: .monospaced))
-                                .foregroundColor(Color.white.opacity(0.25))
+                                .foregroundColor(.white.opacity(0.3))
                         }
                     }
                     .padding(.vertical, 8)
@@ -88,10 +88,10 @@ public struct SyntaxHighlightedCodeBlockView: View {
             }
         }
         .background(Color(red: 0.08, green: 0.09, blue: 0.12).opacity(0.85))
-        .cornerRadius(8)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
         )
     }
     

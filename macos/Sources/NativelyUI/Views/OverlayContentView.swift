@@ -2,9 +2,9 @@ import SwiftUI
 import AppKit
 import NativelyCore
 
-/// Unified top-level stealth overlay interface matching Natively's meeting overlay.
+/// Top-level stealth overlay interface adhering to macOS Human Interface Guidelines.
 /// Hosts the TopPillBar, Context chips, Rolling Transcript, Conversation stream,
-/// persistent Quick Action pills, and the bottom input toolbar.
+/// persistent Quick Action pills, and the bottom prompt toolbar.
 public struct OverlayContentView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     public var onCropTrigger: () -> Void = {}
@@ -35,7 +35,7 @@ public struct OverlayContentView: View {
             
             // 2. EXPANDED MEETING INTERFACE
             if viewModel.isExpanded {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     // Context Status Chips (Web DOM, Screen OCR, Screenshots)
                     contextChipsRow
                     
@@ -55,25 +55,25 @@ public struct OverlayContentView: View {
                     // Bottom Input & Controls Toolbar
                     bottomToolbar
                 }
-                .padding(10)
+                .padding(12)
                 .background(
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.92))
-                        .background(.ultraThinMaterial)
+                    NativelyTheme.VisualEffectBackground(material: .hudWindow, blendingMode: .withinWindow)
                 )
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(NativelyTheme.glowStroke, lineWidth: 0.5)
                 )
-                .shadow(color: Color.black.opacity(0.4), radius: 12, y: 4)
+                .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 8)
             }
         }
         .padding(8)
         .frame(width: 540)
-        .animation(.spring(response: 0.3, dampingFraction: 0.82), value: viewModel.isExpanded)
+        .animation(NativelyTheme.smoothSpring, value: viewModel.isExpanded)
     }
     
     // MARK: - Context Chips Row
+    
     @ViewBuilder
     private var contextChipsRow: some View {
         if viewModel.attachedWebContext != nil || viewModel.attachedOCRSnippet != nil || viewModel.attachedImageBase64 != nil {
@@ -83,10 +83,10 @@ public struct OverlayContentView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "globe")
                             .font(.system(size: 9.5))
-                            .foregroundColor(.cyan)
+                            .foregroundColor(NativelyTheme.cyanBlue)
                         Text("\(web.domain) · \(web.chars) chars")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.85))
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
                             .lineLimit(1)
                         
                         Button(action: {
@@ -94,17 +94,17 @@ public struct OverlayContentView: View {
                         }) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 8))
-                                .foregroundColor(Color.white.opacity(0.6))
+                                .foregroundColor(.white.opacity(0.6))
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Color.cyan.opacity(0.12))
-                    .cornerRadius(8)
+                    .background(NativelyTheme.cyanBlue.opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.cyan.opacity(0.25), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(NativelyTheme.cyanBlue.opacity(0.3), lineWidth: 0.5)
                     )
                 }
                 
@@ -113,27 +113,27 @@ public struct OverlayContentView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "doc.text.viewfinder")
                             .font(.system(size: 9.5))
-                            .foregroundColor(.yellow)
+                            .foregroundColor(NativelyTheme.warningAmber)
                         Text("Screen OCR Attached")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.85))
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
                         
                         Button(action: {
                             viewModel.clearScreenContext()
                         }) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 8))
-                                .foregroundColor(Color.white.opacity(0.6))
+                                .foregroundColor(.white.opacity(0.6))
                         }
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Color.yellow.opacity(0.12))
-                    .cornerRadius(8)
+                    .background(NativelyTheme.warningAmber.opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.yellow.opacity(0.25), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(NativelyTheme.warningAmber.opacity(0.3), lineWidth: 0.5)
                     )
                 }
                 
@@ -144,6 +144,7 @@ public struct OverlayContentView: View {
     }
     
     // MARK: - Quick Action Buttons Row
+    
     private var quickActionButtonsRow: some View {
         HStack(spacing: 5) {
             actionPill(label: "What to answer?", icon: "pencil", action: {
@@ -171,15 +172,15 @@ public struct OverlayContentView: View {
                 HStack(spacing: 4) {
                     if viewModel.isManualRecording {
                         Circle()
-                            .fill(Color.red)
+                            .fill(NativelyTheme.dangerRed)
                             .frame(width: 6, height: 6)
                         Text("Stop")
                             .font(.system(size: 10.5, weight: .bold))
-                            .foregroundColor(Color.red)
+                            .foregroundColor(NativelyTheme.dangerRed)
                     } else {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 9.5))
-                            .foregroundColor(Color.yellow)
+                            .foregroundColor(NativelyTheme.warningAmber)
                         Text("Answer")
                             .font(.system(size: 10.5, weight: .medium))
                             .foregroundColor(.white)
@@ -187,11 +188,11 @@ public struct OverlayContentView: View {
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4.5)
-                .background(viewModel.isManualRecording ? Color.red.opacity(0.2) : Color.white.opacity(0.08))
-                .cornerRadius(12)
+                .background(viewModel.isManualRecording ? NativelyTheme.dangerRed.opacity(0.2) : Color.white.opacity(0.08))
+                .clipShape(Capsule())
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(viewModel.isManualRecording ? Color.red.opacity(0.5) : Color.white.opacity(0.14), lineWidth: 1)
+                    Capsule()
+                        .stroke(viewModel.isManualRecording ? NativelyTheme.dangerRed.opacity(0.5) : Color.white.opacity(0.14), lineWidth: 0.5)
                 )
             }
             .buttonStyle(.plain)
@@ -205,24 +206,25 @@ public struct OverlayContentView: View {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 9))
-                    .foregroundColor(Color.white.opacity(0.7))
+                    .foregroundColor(.white.opacity(0.75))
                 Text(label)
                     .font(.system(size: 10.5, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.85))
+                    .foregroundColor(.white.opacity(0.9))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4.5)
             .background(Color.white.opacity(0.06))
-            .cornerRadius(12)
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                Capsule()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
             )
         }
         .buttonStyle(.plain)
     }
     
     // MARK: - Bottom Toolbar
+    
     private var bottomToolbar: some View {
         VStack(spacing: 6) {
             // Text Input Box
@@ -240,7 +242,7 @@ public struct OverlayContentView: View {
                 Button(action: submitPrompt) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 18))
-                        .foregroundColor(viewModel.quickPromptText.isEmpty ? Color.white.opacity(0.25) : Color.blue)
+                        .foregroundColor(viewModel.quickPromptText.isEmpty ? .white.opacity(0.2) : Color.accentColor)
                 }
                 .buttonStyle(.plain)
                 .disabled(viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -248,10 +250,10 @@ public struct OverlayContentView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(Color.white.opacity(0.05))
-            .cornerRadius(10)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
             )
             
             // Bottom Controls Bar (Model Selector, Settings, Crop, Direct Assist)
@@ -260,21 +262,21 @@ public struct OverlayContentView: View {
                 Button(action: {
                     viewModel.isModelSelectorPresented.toggle()
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Text(viewModel.currentModel.name)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.85))
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(.white.opacity(0.85))
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 8))
-                            .foregroundColor(Color.white.opacity(0.5))
+                            .foregroundColor(.white.opacity(0.5))
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3.5)
                     .background(Color.white.opacity(0.06))
-                    .cornerRadius(8)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
                     )
                 }
                 .buttonStyle(.plain)
@@ -285,11 +287,11 @@ public struct OverlayContentView: View {
                 if viewModel.isDirectAssist {
                     Text("DIRECT")
                         .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                        .foregroundColor(.purple)
+                        .foregroundColor(NativelyTheme.purpleAccent)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color.purple.opacity(0.15))
-                        .cornerRadius(4)
+                        .background(NativelyTheme.purpleAccent.opacity(0.16))
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
                 
                 Spacer()
@@ -305,11 +307,11 @@ public struct OverlayContentView: View {
                         Text("Crop")
                             .font(.system(size: 10.5, weight: .medium))
                     }
-                    .foregroundColor(Color.white.opacity(0.75))
+                    .foregroundColor(.white.opacity(0.75))
                     .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3.5)
                     .background(Color.white.opacity(0.06))
-                    .cornerRadius(6)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .help("Select area to crop (⌘⇧X)")
@@ -320,7 +322,7 @@ public struct OverlayContentView: View {
                 }) {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 11))
-                        .foregroundColor(Color.white.opacity(0.75))
+                        .foregroundColor(.white.opacity(0.75))
                         .padding(5)
                         .background(Color.white.opacity(0.06))
                         .clipShape(Circle())

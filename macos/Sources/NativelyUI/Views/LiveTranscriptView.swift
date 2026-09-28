@@ -1,7 +1,8 @@
 import SwiftUI
 import NativelyCore
 
-/// Live diarized transcript stream displaying microphone ("You") and system audio ("Interviewer") turns.
+/// Live diarized transcript stream adhering to macOS HIG.
+/// Displays microphone ("You") and system audio ("Interviewer") turns with auto-scroll and speaker badges.
 public struct LiveTranscriptView: View {
     public let turns: [TranscriptTurn]
     
@@ -12,13 +13,20 @@ public struct LiveTranscriptView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("LIVE TRANSCRIPTION")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.5))
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(NativelyTheme.emeraldGreen)
+                        .frame(width: 5, height: 5)
+                    Text("LIVE TRANSCRIPTION")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+                
                 Spacer()
+                
                 Text("\(turns.count) turns")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.4))
+                    .font(.system(size: 9.5, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.45))
             }
             .padding(.horizontal, 4)
             
@@ -44,12 +52,12 @@ public struct LiveTranscriptView: View {
         }
         .padding(10)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.75))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
         )
     }
     
@@ -61,17 +69,18 @@ public struct LiveTranscriptView: View {
             // Speaker Badge
             Text(isYou ? "YOU" : "THEM")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundColor(isYou ? Color(red: 0.4, green: 0.9, blue: 0.6) : Color(red: 0.5, green: 0.7, blue: 1.0))
+                .foregroundColor(isYou ? NativelyTheme.emeraldGreen : NativelyTheme.cyanBlue)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(isYou ? Color.green.opacity(0.15) : Color.blue.opacity(0.18))
-                .cornerRadius(4)
+                .background(isYou ? NativelyTheme.emeraldGreen.opacity(0.15) : NativelyTheme.cyanBlue.opacity(0.18))
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             
             // Text Content
             Text(turn.content)
                 .font(.system(size: 12, weight: .regular))
-                .foregroundColor(Color.white.opacity(0.85))
+                .foregroundColor(.white.opacity(0.9))
                 .lineLimit(3)
+                .lineSpacing(1.5)
             
             Spacer()
         }
