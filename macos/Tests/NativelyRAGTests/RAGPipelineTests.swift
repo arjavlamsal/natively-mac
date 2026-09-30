@@ -90,4 +90,31 @@ struct RAGPipelineTests {
         #expect(!lexicalResults.isEmpty)
         #expect(lexicalResults[0].id == "c2")
     }
+
+    @Test("DocumentIngestionService parses and chunks reference files into AppDatabase")
+    func testDocumentIngestion() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let meetingId = "m-doc-ingest"
+        try db.saveMeeting(Meeting(id: meetingId, title: "Document Ingestion Meeting"))
+
+        let ingestion = DocumentIngestionService(database: db)
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("sample_system_design.md")
+        let sampleContent = """
+        # System Architecture
+        The native macOS client replaces Electron with Swift 6 AppKit and SwiftUI.
+        Memory footprint drops from 800MB to under 45MB.
+        ScreenCaptureKit provides 60fps frame streaming with hardware-accelerated metal blending.
+        WhisperKit runs locally on Apple Silicon Neural Engine with zero cloud roundtrip latency.
+        """
+        try sampleContent.write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let count = try await ingestion.ingestDocument(at: tempURL, meetingId: meetingId)
+        #expect(count >= 1)
+
+        let savedChunks = try db.fetchVectorChunks(meetingId: meetingId)
+        #expect(savedChunks.count == count)
+        #expect(savedChunks[0].text.contains("[sample_system_design.md]"))
+        #expect(savedChunks[0].text.contains("System Architecture"))
+    }
 }
