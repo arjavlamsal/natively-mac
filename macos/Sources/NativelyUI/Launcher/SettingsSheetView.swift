@@ -866,7 +866,14 @@ public struct SettingsSheetView: View {
     
     private func importReferenceDocument() {
         let openPanel = NSOpenPanel()
-        openPanel.allowedContentTypes = [.pdf, .plainText]
+        var types: [UTType] = [.pdf, .plainText, .utf8PlainText]
+        if let mdType = UTType(filenameExtension: "md") {
+            types.append(mdType)
+        }
+        if let markdownType = UTType(filenameExtension: "markdown") {
+            types.append(markdownType)
+        }
+        openPanel.allowedContentTypes = types
         openPanel.allowsMultipleSelection = false
         openPanel.canChooseDirectories = false
         openPanel.canChooseFiles = true

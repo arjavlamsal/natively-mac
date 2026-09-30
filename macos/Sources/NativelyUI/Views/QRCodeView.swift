@@ -5,8 +5,7 @@ import AppKit
 /// Renders a sharp, high-DPI QR code from text or URL using Apple CoreImage.
 public struct QRCodeView: View {
     public let content: String
-    private let context = CIContext()
-    private let filter = CIFilter.qrCodeGenerator()
+    private static let sharedContext = CIContext()
     
     public init(content: String) {
         self.content = content
@@ -26,6 +25,8 @@ public struct QRCodeView: View {
     }
     
     private func generateQRCode(from string: String) -> NSImage? {
+        guard !string.isEmpty else { return nil }
+        let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(string.utf8)
         filter.correctionLevel = "M"
         
@@ -34,7 +35,7 @@ public struct QRCodeView: View {
         let transform = CGAffineTransform(scaleX: 10, y: 10)
         let scaledImage = outputImage.transformed(by: transform)
         
-        guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else {
+        guard let cgImage = Self.sharedContext.createCGImage(scaledImage, from: scaledImage.extent) else {
             return nil
         }
         

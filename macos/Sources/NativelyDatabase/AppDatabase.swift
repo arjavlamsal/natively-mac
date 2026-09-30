@@ -227,7 +227,13 @@ public final class AppDatabase: Sendable {
 
     public func deleteMode(id: String) throws {
         try dbWriter.write { db in
+            let wasActive = try ModeRecord.filter(Column("id") == id && Column("is_active") == 1).fetchCount(db) > 0
             _ = try ModeRecord.filter(Column("id") == id).deleteAll(db)
+            if wasActive {
+                if let fallback = try ModeRecord.fetchOne(db) {
+                    try db.execute(sql: "UPDATE modes SET is_active = 1 WHERE id = ?", arguments: [fallback.id])
+                }
+            }
         }
     }
 

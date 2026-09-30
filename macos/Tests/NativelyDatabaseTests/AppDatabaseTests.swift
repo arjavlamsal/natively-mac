@@ -149,5 +149,16 @@ struct AppDatabaseTests {
         try db.deleteMode(id: "custom-negotiation")
         #expect(try db.fetchModes().count == 11)
         #expect(try db.fetchMode(id: "custom-negotiation") == nil)
+
+        // Add active custom mode and delete it - verify fallback activates another mode
+        let activeCustom = Mode(id: "custom-active", name: "Custom Active", prompt: "Active", isCustom: true, isActive: true)
+        try db.saveMode(activeCustom)
+        try db.setActiveMode(id: "custom-active")
+        #expect(try db.fetchActiveMode()?.id == "custom-active")
+
+        try db.deleteMode(id: "custom-active")
+        let fallbackActive = try db.fetchActiveMode()
+        #expect(fallbackActive != nil)
+        #expect(fallbackActive?.id != "custom-active")
     }
 }

@@ -594,7 +594,11 @@ public struct MeetingDetailView: View {
         let md = viewModel.exportMeetingMarkdown(meeting)
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.pdf]
-        savePanel.nameFieldStringValue = "\(meeting.title ?? "Meeting").pdf"
+        let safeTitle = (meeting.title ?? "Meeting")
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        savePanel.nameFieldStringValue = "\(safeTitle).pdf"
         
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
@@ -620,7 +624,11 @@ public struct MeetingDetailView: View {
         let txt = viewModel.exportMeetingPlainText(meeting)
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.plainText]
-        savePanel.nameFieldStringValue = "\(meeting.title ?? "Meeting").txt"
+        let safeTitle = (meeting.title ?? "Meeting")
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        savePanel.nameFieldStringValue = "\(safeTitle).txt"
         
         savePanel.begin { response in
             if response == .OK, let url = savePanel.url {
