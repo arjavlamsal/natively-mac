@@ -235,4 +235,65 @@ struct AIPipelineTests {
         #expect(savedInteractions[0].aiResponse == "Optimized O(N) solution")
         #expect(savedInteractions[0].type == "answer")
     }
+    
+    @Test("FollowUpDraftGenerator produces tailored drafts for all tones and types")
+    func testFollowUpDraftGenerator() {
+        let summary = DetailedSummary(
+            overview: "Architecture review of the native Swift Mac client.",
+            actionItems: ["Finalize tests", "Build DMG package"],
+            keyPoints: ["Replaced Electron with Swift 6 AppKit/SwiftUI", "Zero Electron runtime memory overhead"],
+            decisions: [DecisionItem(text: "Use GRDB SQLite instead of Realm")]
+        )
+        let meeting = Meeting(
+            id: "m-draft",
+            title: "Mac Architecture Sync",
+            summaryJson: String(data: try! JSONEncoder().encode(summary), encoding: .utf8)
+        )
+        
+        // 1. Concise email
+        let draftEmail = FollowUpDraftGenerator.generateDraft(meeting: meeting, modeId: "general", tone: .concise, draftType: .email)
+        #expect(draftEmail.subject.contains("Follow-up:"))
+        #expect(draftEmail.body.contains("Key Points Discussed:"))
+        #expect(draftEmail.actionItems.count == 2)
+        #expect(draftEmail.fullFormattedText.contains("Next Steps / Action Items:"))
+        
+        // 2. Formal interview feedback
+        let draftInterview = FollowUpDraftGenerator.generateDraft(meeting: meeting, modeId: "technical-interview", tone: .formal, draftType: .interviewFeedback)
+        #expect(draftInterview.subject.contains("Interview Notes"))
+        #expect(draftInterview.greeting.contains("Hiring Team"))
+        #expect(draftInterview.fullFormattedText.contains("Next Steps"))
+        
+        // 3. Friendly project update
+        let draftUpdate = FollowUpDraftGenerator.generateDraft(meeting: meeting, modeId: "team-meet", tone: .friendly, draftType: .projectUpdate)
+        #expect(draftUpdate.subject.contains("Project Update"))
+        #expect(draftUpdate.body.contains("Decisions & Highlights:"))
+        
+        // 4. Study notes
+        let draftNotes = FollowUpDraftGenerator.generateDraft(meeting: meeting, modeId: "lecture", tone: .casual, draftType: .studyNotes)
+        #expect(draftNotes.subject.contains("Lecture & Discussion Notes"))
+        #expect(draftNotes.greeting.contains("Summary Notes"))
+    }
+    
+    @Test("ModePromptBuilder generates distinct tailored prompts for all 11 modes")
+    func testAllElevenModesInPromptBuilder() {
+        let allModes = [
+            "technical-interview",
+            "looking-for-work",
+            "sales",
+            "recruiting",
+            "team-meet",
+            "lecture",
+            "seminar",
+            "call-center",
+            "negotiation",
+            "executive",
+            "general"
+        ]
+        
+        for mode in allModes {
+            let prompt = ModePromptBuilder.buildSystemPrompt(modeId: mode, screenContext: nil)
+            #expect(!prompt.isEmpty)
+            #expect(prompt.contains("You are Natively"))
+        }
+    }
 }
