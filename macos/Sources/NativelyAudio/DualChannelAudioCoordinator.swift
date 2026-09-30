@@ -10,7 +10,9 @@ public actor DualChannelAudioCoordinator {
     private let routeObserver: AudioRouteObserver
     private let vad: VoiceActivityDetector
     private let transcriptionService: WhisperTranscriptionService
+    private let appleSpeechService: AppleSpeechTranscriptionService
     private let database: AppDatabase
+    private var sttEngine: STTEngineType = .whisperKit
 
     private var activeMeetingId: String?
     private var isRecording = false
@@ -29,7 +31,9 @@ public actor DualChannelAudioCoordinator {
         systemAudioService: SystemAudioCaptureService = SystemAudioCaptureService(),
         routeObserver: AudioRouteObserver = AudioRouteObserver(),
         vad: VoiceActivityDetector = VoiceActivityDetector(),
-        transcriptionService: WhisperTranscriptionService = WhisperTranscriptionService()
+        transcriptionService: WhisperTranscriptionService = WhisperTranscriptionService(),
+        appleSpeechService: AppleSpeechTranscriptionService = AppleSpeechTranscriptionService(),
+        sttEngine: STTEngineType = .whisperKit
     ) {
         self.database = database
         self.micService = micService
@@ -37,6 +41,8 @@ public actor DualChannelAudioCoordinator {
         self.routeObserver = routeObserver
         self.vad = vad
         self.transcriptionService = transcriptionService
+        self.appleSpeechService = appleSpeechService
+        self.sttEngine = sttEngine
 
         setupRouteObserver()
     }
@@ -52,6 +58,10 @@ public actor DualChannelAudioCoordinator {
     private func handleAudioRouteChange() {
         guard isRecording else { return }
         try? micService.reconfigure()
+    }
+
+    public func setSTTEngine(_ engine: STTEngineType) {
+        self.sttEngine = engine
     }
 
     public func setTurnHandler(_ handler: @escaping TranscriptTurnHandler) {
@@ -147,7 +157,12 @@ public actor DualChannelAudioCoordinator {
         guard let meetingId = self.activeMeetingId else { return }
 
         do {
-            let segments = try await transcriptionService.transcribe(audioSamples: samples)
+            let segments: [WhisperSegment]
+            if sttEngine == .appleSpeech {
+                segments = try await appleSpeechService.transcribe(audioSamples: samples)
+            } else {
+                segments = try await transcriptionService.transcribe(audioSamples: samples)
+            }
             for segment in segments {
                 let turn = TranscriptTurn(
                     meetingId: meetingId,

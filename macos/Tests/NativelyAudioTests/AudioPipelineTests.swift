@@ -116,4 +116,22 @@ struct AudioPipelineTests {
         await coordinator.ingestChunk(micChunk)
         await coordinator.ingestChunk(sysChunk)
     }
+
+    @Test("AudioDeviceManager discovers available input devices")
+    func testAudioDeviceManager() {
+        let manager = AudioDeviceManager.shared
+        let devices = manager.getAvailableMicrophones()
+        #expect(!devices.isEmpty)
+        #expect(!devices[0].name.isEmpty)
+        #expect(!devices[0].id.isEmpty)
+    }
+
+    @Test("DualChannelAudioCoordinator supports dynamic STT engine switching")
+    func testSTTEngineSwitching() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let coordinator = DualChannelAudioCoordinator(database: db)
+
+        await coordinator.setSTTEngine(.appleSpeech)
+        await coordinator.setSTTEngine(.whisperKit)
+    }
 }
