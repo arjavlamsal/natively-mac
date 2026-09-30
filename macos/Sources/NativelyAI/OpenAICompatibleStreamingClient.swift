@@ -44,7 +44,7 @@ public final class OpenAICompatibleStreamingClient: StreamingAIProvider, Sendabl
     public func stream(request: AIRequest, apiKey: String?) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                guard let key = apiKey, !key.isEmpty else {
+                guard let key = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else {
                     continuation.finish(throwing: AIClientError.missingAPIKey(providerType.displayName))
                     return
                 }
@@ -85,11 +85,17 @@ public final class OpenAICompatibleStreamingClient: StreamingAIProvider, Sendabl
                     "stream": true
                 ]
                 
-                if let temp = request.temperature {
+                let isReasoningModel = request.model.hasPrefix("o1") || request.model.hasPrefix("o3")
+                if !isReasoningModel, let temp = request.temperature {
                     payload["temperature"] = temp
                 }
+                
                 if let maxTokens = request.maxTokens {
-                    payload["max_tokens"] = maxTokens
+                    if isReasoningModel {
+                        payload["max_completion_tokens"] = maxTokens
+                    } else {
+                        payload["max_tokens"] = maxTokens
+                    }
                 }
                 
                 do {
@@ -101,23 +107,49 @@ public final class OpenAICompatibleStreamingClient: StreamingAIProvider, Sendabl
                         for try await line in asyncBytes.lines {
                             errorBody += line
                         }
-                        continuation.finish(throwing: AIClientError.httpError(statusCode: httpResponse.statusCode, body: errorBody))
+                        var userFacingMsg = errorBody
+                        if let bodyData = errorBody.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                           let errObj = json["error"] as? [String: Any],
+                           let msg = errObj["message"] as? String {
+                            userFacingMsg = msg
+                        }
+                        continuation.finish(throwing: AIClientError.httpError(statusCode: httpResponse.statusCode, body: userFacingMsg))
                         return
                     }
                     
                     var parser = SSEParser()
+                    var hasEmittedAnyChunk = false
+                    
                     for try await line in asyncBytes.lines {
+                        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.isEmpty { continue }
+                        
+                        // Fast path: if the line directly starts with data:, parse it immediately!
+                        if trimmed.hasPrefix("data:") {
+                            let jsonString = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                            let (emitted, isTerminal) = handleSinglePayload(jsonString, continuation: continuation)
+                            if emitted { hasEmittedAnyChunk = true }
+                            if isTerminal { break }
+                            if emitted { continue }
+                        }
+                        
                         if let event = parser.feed(line: line) {
-                            if handleEvent(event, continuation: continuation) {
-                                break
-                            }
+                            let (emitted, isTerminal) = handleEvent(event, continuation: continuation)
+                            if emitted { hasEmittedAnyChunk = true }
+                            if isTerminal { break }
                         }
                     }
                     if let trailing = parser.finish() {
-                        _ = handleEvent(trailing, continuation: continuation)
+                        let (emitted, _) = handleEvent(trailing, continuation: continuation)
+                        if emitted { hasEmittedAnyChunk = true }
                     }
                     
-                    continuation.finish()
+                    if !hasEmittedAnyChunk {
+                        continuation.finish(throwing: AIClientError.emptyResponse)
+                    } else {
+                        continuation.finish()
+                    }
                 } catch {
                     continuation.finish(throwing: error)
                 }
@@ -125,42 +157,54 @@ public final class OpenAICompatibleStreamingClient: StreamingAIProvider, Sendabl
         }
     }
     
-    private func handleEvent(_ event: SSEEvent, continuation: AsyncThrowingStream<String, Error>.Continuation) -> Bool {
-        if handleSinglePayload(event.data, continuation: continuation) {
-            return true
-        }
+    private func handleEvent(_ event: SSEEvent, continuation: AsyncThrowingStream<String, Error>.Continuation) -> (emitted: Bool, isTerminal: Bool) {
+        let (emitted, isTerminal) = handleSinglePayload(event.data, continuation: continuation)
+        if emitted || isTerminal { return (emitted, isTerminal) }
         
         let lines = event.data.components(separatedBy: "\n")
         var anyEmitted = false
+        var terminal = false
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty || trimmed == "[DONE]" || trimmed == "data: [DONE]" { continue }
+            if trimmed.isEmpty { continue }
             let payload = trimmed.hasPrefix("data:") ? String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces) : trimmed
-            if handleSinglePayload(payload, continuation: continuation) {
-                anyEmitted = true
-            }
+            let (e, t) = handleSinglePayload(payload, continuation: continuation)
+            if e { anyEmitted = true }
+            if t { terminal = true; break }
         }
-        return anyEmitted
+        return (anyEmitted, terminal)
     }
     
-    private func handleSinglePayload(_ dataStr: String, continuation: AsyncThrowingStream<String, Error>.Continuation) -> Bool {
+    private func handleSinglePayload(_ dataStr: String, continuation: AsyncThrowingStream<String, Error>.Continuation) -> (emitted: Bool, isTerminal: Bool) {
         let trimmed = dataStr.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed == "[DONE]" {
-            return true
+            return (false, true)
         }
         
         guard let eventData = trimmed.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let first = choices.first,
-              let delta = first["delta"] as? [String: Any] else {
-            return false
+              let json = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any] else {
+            return (false, false)
         }
         
-        if let content = delta["content"] as? String {
-            continuation.yield(content)
-            return true
+        if let errObj = json["error"] as? [String: Any],
+           let msg = errObj["message"] as? String {
+            continuation.finish(throwing: AIClientError.httpError(statusCode: 400, body: msg))
+            return (false, true)
         }
-        return false
+        
+        guard let choices = json["choices"] as? [[String: Any]],
+              let first = choices.first,
+              let delta = first["delta"] as? [String: Any] else {
+            return (false, false)
+        }
+        
+        if let content = delta["content"] as? String, !content.isEmpty {
+            continuation.yield(content)
+            return (true, false)
+        } else if let reasoning = (delta["reasoning_content"] as? String) ?? (delta["reasoning"] as? String), !reasoning.isEmpty {
+            continuation.yield(reasoning)
+            return (true, false)
+        }
+        return (false, false)
     }
 }

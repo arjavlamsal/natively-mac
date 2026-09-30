@@ -64,9 +64,17 @@ public final class OllamaStreamingClient: StreamingAIProvider, Sendable {
                         for try await line in asyncBytes.lines {
                             errorBody += line
                         }
-                        continuation.finish(throwing: AIClientError.httpError(statusCode: httpResponse.statusCode, body: errorBody))
+                        var userFacingMsg = errorBody
+                        if let bodyData = errorBody.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                           let errMsg = json["error"] as? String {
+                            userFacingMsg = errMsg
+                        }
+                        continuation.finish(throwing: AIClientError.httpError(statusCode: httpResponse.statusCode, body: userFacingMsg))
                         return
                     }
+                    
+                    var hasEmittedAnyChunk = false
                     
                     for try await line in asyncBytes.lines {
                         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -76,9 +84,15 @@ public final class OllamaStreamingClient: StreamingAIProvider, Sendable {
                             continue
                         }
                         
+                        if let errMsg = json["error"] as? String {
+                            continuation.finish(throwing: AIClientError.httpError(statusCode: 400, body: errMsg))
+                            return
+                        }
+                        
                         if let message = json["message"] as? [String: Any],
-                           let content = message["content"] as? String {
+                           let content = message["content"] as? String, !content.isEmpty {
                             continuation.yield(content)
+                            hasEmittedAnyChunk = true
                         }
                         
                         if let isDone = json["done"] as? Bool, isDone {
@@ -86,7 +100,11 @@ public final class OllamaStreamingClient: StreamingAIProvider, Sendable {
                         }
                     }
                     
-                    continuation.finish()
+                    if !hasEmittedAnyChunk {
+                        continuation.finish(throwing: AIClientError.emptyResponse)
+                    } else {
+                        continuation.finish()
+                    }
                 } catch {
                     continuation.finish(throwing: error)
                 }

@@ -82,6 +82,31 @@ struct AIPipelineTests {
         #expect(events[2].data == "[DONE]")
     }
     
+    @Test("SSEParser handles continuous data frames without empty line delimiters (Gemini/OpenAI streaming)")
+    func testSSEParserWithoutBlankLines() async throws {
+        let continuousLines = [
+            "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \"Hello!\"}]}}]}",
+            "data: {\"candidates\": [{\"content\": {\"parts\": [{\"text\": \" How can I help?\"}]}}]}",
+            "data: [DONE]"
+        ]
+        
+        var parser = SSEParser()
+        var events: [SSEEvent] = []
+        for line in continuousLines {
+            if let evt = parser.feed(line: line) {
+                events.append(evt)
+            }
+        }
+        if let trailing = parser.finish() {
+            events.append(trailing)
+        }
+        
+        #expect(events.count == 3)
+        #expect(events[0].data.contains("Hello!"))
+        #expect(events[1].data.contains("How can I help?"))
+        #expect(events[2].data == "[DONE]")
+    }
+    
     @Test("ModePromptBuilder generates targeted system prompts with screen OCR")
     func testModePromptBuilder() {
         let ocrResult = OCRResult(fullText: "class Solution { func twoSum() }")
