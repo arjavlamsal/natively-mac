@@ -337,7 +337,21 @@ public struct OverlayContentView: View {
                 
                 Spacer()
                 
-                // 3. Screen Crop Button (⌘⇧X)
+                // 3a. Full Screen Capture Button (⌘⇧H)
+                Button(action: {
+                    viewModel.onFullScreenCapture?()
+                }) {
+                    Image(systemName: "camera")
+                        .font(.system(size: 12))
+                        .foregroundColor(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber : .white.opacity(0.8))
+                        .padding(6)
+                        .background(Color.white.opacity(0.07))
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Capture Full Screen & Vision OCR (⌘⇧H)")
+                
+                // 3b. Screen Crop Button (⌘⇧X)
                 Button(action: {
                     onCropTrigger()
                     viewModel.onCropTrigger?()

@@ -117,6 +117,7 @@ public final class OverlayViewModel: ObservableObject {
     // Vision / Screen Context
     @Published public var attachedOCRSnippet: String? = nil
     @Published public var attachedImageBase64: String? = nil
+    public var activeScreenContext: ScreenContext? = nil
     
     // Web DOM Context
     @Published public var attachedWebContext: WebPageContext? = nil
@@ -125,6 +126,7 @@ public final class OverlayViewModel: ObservableObject {
     public var onEndMeeting: (@MainActor () -> Void)?
     public var onOpenLauncher: (@MainActor () -> Void)?
     public var onCropTrigger: (@MainActor () -> Void)?
+    public var onFullScreenCapture: (@MainActor () -> Void)?
     
     // Services
     public let database: AppDatabase
@@ -220,15 +222,17 @@ public final class OverlayViewModel: ObservableObject {
     }
     
     /// Attaches screen context from an interactive crop or full screen capture.
-    public func attachScreenContext(ocrText: String, imageBase64: String?) {
+    public func attachScreenContext(ocrText: String, imageBase64: String?, screenContext: ScreenContext? = nil) {
         self.attachedOCRSnippet = ocrText
         self.attachedImageBase64 = imageBase64
+        self.activeScreenContext = screenContext
     }
     
     /// Clears active screen context.
     public func clearScreenContext() {
         self.attachedOCRSnippet = nil
         self.attachedImageBase64 = nil
+        self.activeScreenContext = nil
     }
     
     /// Attaches web page DOM context received from browser companion extension.
@@ -299,6 +303,10 @@ public final class OverlayViewModel: ObservableObject {
         let mode = activeMode
         let planner = turnPlanner
         let ocrContext = attachedOCRSnippet
+        let screenContextToUse = activeScreenContext
+        
+        // Reset attached screen chip for subsequent questions
+        self.clearScreenContext()
         
         streamingTask = Task { [weak self] in
             let startTime = DispatchTime.now()
@@ -339,7 +347,7 @@ public final class OverlayViewModel: ObservableObject {
                         question: fullPrompt,
                         meetingId: meetingId,
                         modeId: mode.id,
-                        screenContext: nil,
+                        screenContext: screenContextToUse,
                         customLadder: dynamicLadder
                     )
                     
@@ -440,6 +448,20 @@ public final class OverlayViewModel: ObservableObject {
         if let idx = messages.firstIndex(where: { $0.id == id }) {
             messages[idx].isStreaming = false
         }
+    }
+    
+    /// Appends a static assistant notification/error message directly to the conversation.
+    public func appendAssistantMessage(text: String) {
+        let msg = OverlayMessage(
+            id: UUID().uuidString,
+            role: .assistant,
+            text: text,
+            isStreaming: false,
+            providerName: "System",
+            modelName: "Natively"
+        )
+        messages.append(msg)
+        isExpanded = true
     }
     
     /// Triggers one of the quick action presets (Cmd+1 to Cmd+7).

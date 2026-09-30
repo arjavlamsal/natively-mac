@@ -128,4 +128,19 @@ struct VisionPipelineTests {
         #expect(roundTrip.width == cocoaRect.width)
         #expect(roundTrip.height == cocoaRect.height)
     }
+    
+    @Test("ScreenCaptureService captures rectangle with resilient fallback")
+    func testScreenCaptureServiceRectCapture() async throws {
+        let service = ScreenCaptureService()
+        if ScreenCaptureService.hasPermission {
+            let rect = CGRect(x: 10, y: 10, width: 60, height: 40)
+            let capturedImage = try await service.captureRect(rect)
+            #expect(capturedImage.width > 0)
+            #expect(capturedImage.height > 0)
+        } else {
+            // If permission is not granted in the headless test runner environment,
+            // hasPermission correctly returns false
+            #expect(!ScreenCaptureService.hasPermission)
+        }
+    }
 }

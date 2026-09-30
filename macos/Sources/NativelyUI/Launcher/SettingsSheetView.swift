@@ -903,7 +903,78 @@ public struct SettingsSheetView: View {
     // MARK: - General & About Section
     
     private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
+            // 1. System Permissions Card
+            VStack(alignment: .leading, spacing: 12) {
+                Text("SYSTEM PERMISSIONS")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(NativelyTheme.textTertiary)
+                
+                // Screen Recording
+                HStack {
+                    Image(systemName: "rectangle.dashed.badge.record")
+                        .font(.system(size: 14))
+                        .foregroundColor(PermissionsManager.shared.hasScreenRecordingPermission ? NativelyTheme.emeraldGreen : NativelyTheme.warningAmber)
+                        .frame(width: 20)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Screen & System Audio Recording")
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundColor(NativelyTheme.textPrimary)
+                        Text(PermissionsManager.shared.hasScreenRecordingPermission ? "Access granted. Vision OCR and system audio loopback active." : "Required for full-screen analysis, interactive cropping, and system audio.")
+                            .font(.system(size: 11))
+                            .foregroundColor(NativelyTheme.textTertiary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(PermissionsManager.shared.hasScreenRecordingPermission ? "Settings" : "Grant Access") {
+                        PermissionsManager.shared.requestScreenRecordingPermission()
+                        PermissionsManager.shared.openScreenRecordingSettings()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                
+                Divider().background(NativelyTheme.borderSubtle)
+                
+                // Microphone
+                HStack {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(PermissionsManager.shared.hasMicrophonePermission ? NativelyTheme.emeraldGreen : NativelyTheme.warningAmber)
+                        .frame(width: 20)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Microphone Input")
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundColor(NativelyTheme.textPrimary)
+                        Text(PermissionsManager.shared.hasMicrophonePermission ? "Access granted. Microphone transcription active." : "Required for voice transcription during interviews and meetings.")
+                            .font(.system(size: 11))
+                            .foregroundColor(NativelyTheme.textTertiary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(PermissionsManager.shared.hasMicrophonePermission ? "Settings" : "Grant Access") {
+                        Task {
+                            _ = await PermissionsManager.shared.requestMicrophonePermission()
+                            PermissionsManager.shared.openMicrophoneSettings()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+            }
+            .padding(14)
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(NativelyTheme.borderSubtle, lineWidth: 0.5)
+            )
+            
+            // 2. Preferences
             Toggle(isOn: .constant(true)) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Auto-Start Recording on Meeting Join")
@@ -918,6 +989,9 @@ public struct SettingsSheetView: View {
             .padding(14)
             .background(NativelyTheme.bgCard)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .onAppear {
+            PermissionsManager.shared.checkAllPermissions()
         }
     }
     

@@ -14,6 +14,7 @@ public final class MenuBarController: NSObject, ObservableObject {
     
     public var onToggleOverlay: (@MainActor () -> Void)?
     public var onTriggerCrop: (@MainActor () -> Void)?
+    public var onTriggerFullScreenCapture: (@MainActor () -> Void)?
     public var onOpenDashboard: (@MainActor () -> Void)?
     public var onToggleMeeting: (@MainActor () -> Void)?
     public var onSelectMode: (@MainActor (Mode) -> Void)?
@@ -91,6 +92,11 @@ public final class MenuBarController: NSObject, ObservableObject {
         cropItem.target = self
         menu.addItem(cropItem)
         
+        let fullScreenItem = NSMenuItem(title: "Capture Full Screen", action: #selector(handleTriggerFullScreenCapture), keyEquivalent: "H")
+        fullScreenItem.keyEquivalentModifierMask = [.command, .shift]
+        fullScreenItem.target = self
+        menu.addItem(fullScreenItem)
+        
         let dashboardItem = NSMenuItem(title: "Open Launcher Dashboard", action: #selector(handleOpenDashboard), keyEquivalent: "o")
         dashboardItem.keyEquivalentModifierMask = [.command]
         dashboardItem.target = self
@@ -149,6 +155,10 @@ public final class MenuBarController: NSObject, ObservableObject {
     
     @objc private func handleTriggerCrop() {
         onTriggerCrop?()
+    }
+    
+    @objc private func handleTriggerFullScreenCapture() {
+        onTriggerFullScreenCapture?()
     }
     
     @objc private func handleOpenDashboard() {

@@ -164,6 +164,10 @@ public final class AppCoordinator: ObservableObject {
             self?.overlayWindowManager.handleCropTrigger()
         }
         
+        menuBarController.onTriggerFullScreenCapture = { [weak self] in
+            self?.overlayWindowManager.handleFullScreenCapture()
+        }
+        
         menuBarController.onOpenDashboard = { [weak self] in
             self?.launcherWindowManager.showLauncher()
         }
@@ -194,6 +198,10 @@ public final class AppCoordinator: ObservableObject {
         
         hotkeyManager.onAction(.triggerCrop) { [weak self] in
             self?.overlayWindowManager.handleCropTrigger()
+        }
+        
+        hotkeyManager.onAction(.captureFullScreen) { [weak self] in
+            self?.overlayWindowManager.handleFullScreenCapture()
         }
         
         hotkeyManager.onAction(.processScreenshots) { [weak self] in

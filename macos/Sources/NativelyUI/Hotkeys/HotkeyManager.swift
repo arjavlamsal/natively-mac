@@ -8,7 +8,8 @@ public enum HotkeyAction: UInt32, CaseIterable, Sendable {
     case toggleStealthFocus = 1003        // Cmd+Shift+Space
     case captureAndAsk = 1004             // Cmd+Shift+Enter
     case processScreenshots = 1005        // Cmd+Enter
-    case triggerCrop = 1006               // Cmd+Shift+X or Cmd+Shift+H
+    case triggerCrop = 1006               // Cmd+Shift+X
+    case captureFullScreen = 1007         // Cmd+Shift+H
     
     // Quick Action Presets (Cmd+1 through Cmd+7)
     case quickAction1 = 1011              // What to Answer
@@ -59,6 +60,7 @@ public final class HotkeyManager {
         register(action: .processScreenshots, keyCode: UInt32(kVK_Return), modifiers: cmd)
         register(action: .captureAndAsk, keyCode: UInt32(kVK_Return), modifiers: cmdShift)
         register(action: .triggerCrop, keyCode: UInt32(kVK_ANSI_X), modifiers: cmdShift)
+        register(action: .captureFullScreen, keyCode: UInt32(kVK_ANSI_H), modifiers: cmdShift)
         
         // Quick Action Presets (Cmd+1 .. Cmd+7)
         register(action: .quickAction1, keyCode: UInt32(kVK_ANSI_1), modifiers: cmd)

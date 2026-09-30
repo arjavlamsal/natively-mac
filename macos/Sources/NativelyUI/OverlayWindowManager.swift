@@ -18,6 +18,12 @@ public final class OverlayWindowManager: ObservableObject {
     
     public init(database: AppDatabase = .shared) {
         self.viewModel = OverlayViewModel(database: database)
+        self.viewModel.onCropTrigger = { [weak self] in
+            self?.handleCropTrigger()
+        }
+        self.viewModel.onFullScreenCapture = { [weak self] in
+            self?.handleFullScreenCapture()
+        }
     }
     
     /// Sets stealth mode (screen sharing invisibility).
@@ -125,11 +131,34 @@ public final class OverlayWindowManager: ObservableObject {
                 if let cropResult = try await vision.captureAndAnalyze(region: .interactiveCropper) {
                     self.viewModel.attachScreenContext(
                         ocrText: cropResult.ocrResult.fullText,
-                        imageBase64: cropResult.base64DataUrl
+                        imageBase64: cropResult.base64DataUrl,
+                        screenContext: cropResult
                     )
                 }
             } catch {
-                // User cancelled or capture failed
+                self.viewModel.appendAssistantMessage(
+                    text: "⚠️ Screen capture error: \(error.localizedDescription)"
+                )
+            }
+        }
+    }
+    
+    /// Captures the full active display and attaches OCR + vision context.
+    public func handleFullScreenCapture() {
+        Task { [weak self] in
+            guard let self, let vision = self.screenVisionCoordinator else { return }
+            do {
+                if let result = try await vision.captureAndAnalyze(region: .mainDisplay) {
+                    self.viewModel.attachScreenContext(
+                        ocrText: result.ocrResult.fullText,
+                        imageBase64: result.base64DataUrl,
+                        screenContext: result
+                    )
+                }
+            } catch {
+                self.viewModel.appendAssistantMessage(
+                    text: "⚠️ Full screen capture error: \(error.localizedDescription)"
+                )
             }
         }
     }
@@ -149,6 +178,9 @@ public final class OverlayWindowManager: ObservableObject {
         }
         hotkeys.onAction(.triggerCrop) { [weak self] in
             self?.handleCropTrigger()
+        }
+        hotkeys.onAction(.captureFullScreen) { [weak self] in
+            self?.handleFullScreenCapture()
         }
         hotkeys.onAction(.captureAndAsk) { [weak self] in
             self?.handleCropTrigger()

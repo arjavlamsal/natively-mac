@@ -7,12 +7,12 @@ public final class CropperPanel: NSPanel {
     public init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         self.isFloatingPanel = true
-        self.level = .screenSaver
+        self.level = .statusBar
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         self.isOpaque = false
         self.backgroundColor = .clear
@@ -97,21 +97,35 @@ public final class CropperOverlayView: NSView {
         }
     }
     
+    public override var acceptsFirstResponder: Bool { true }
+    
     public override func keyDown(with event: NSEvent) {
-        // Esc key (53)
+        // Esc key (53): Cancel
         if event.keyCode == 53 {
             onCancelled?()
             return
         }
+        // Spacebar (49): Select full active display immediately
+        if event.keyCode == 49 {
+            let activeScreen = NSScreen.main?.frame ?? (NSScreen.screens.first?.frame ?? bounds)
+            onSelectionConfirmed?(activeScreen)
+            return
+        }
         // Enter / Return (36)
-        if event.keyCode == 36, let sp = startPoint, let cp = currentPoint {
-            let rect = currentSelectionRect(from: sp, to: cp)
-            if rect.width >= minSelectionSize && rect.height >= minSelectionSize {
-                let windowRect = convert(rect, to: nil)
-                let screenRect = window?.convertToScreen(windowRect) ?? windowRect
-                onSelectionConfirmed?(screenRect)
-                return
+        if event.keyCode == 36 {
+            if let sp = startPoint, let cp = currentPoint {
+                let rect = currentSelectionRect(from: sp, to: cp)
+                if rect.width >= minSelectionSize && rect.height >= minSelectionSize {
+                    let windowRect = convert(rect, to: nil)
+                    let screenRect = window?.convertToScreen(windowRect) ?? windowRect
+                    onSelectionConfirmed?(screenRect)
+                    return
+                }
             }
+            // If no drag selection, Return confirms active screen
+            let activeScreen = NSScreen.main?.frame ?? (NSScreen.screens.first?.frame ?? bounds)
+            onSelectionConfirmed?(activeScreen)
+            return
         }
         super.keyDown(with: event)
     }
@@ -257,6 +271,7 @@ public final class InteractiveCropper: NSObject {
             
             panel.setFrame(unionBounds, display: true)
             panel.makeKeyAndOrderFront(nil)
+            panel.makeFirstResponder(overlay)
             NSApp.activate(ignoringOtherApps: true)
         }
     }

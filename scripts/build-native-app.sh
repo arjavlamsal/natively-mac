@@ -40,10 +40,22 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/NativelyMac"
 cp "$MACOS_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 
-echo "==> [4/5] Ad-hoc signing application bundle with hardened entitlements..."
-codesign --force --deep --sign - \
-    --entitlements "$MACOS_DIR/Resources/NativelyMac.entitlements" \
-    "$APP_BUNDLE"
+echo "==> [4/5] Code signing application bundle with hardened entitlements..."
+# Look for an available Apple Development identity in user keychain
+SIGNING_IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Development" | head -n 1 | awk -F'"' '{print $2}' || true)"
+
+if [ -n "$SIGNING_IDENTITY" ]; then
+    echo "    Using valid code signing identity: $SIGNING_IDENTITY"
+    codesign --force --deep --sign "$SIGNING_IDENTITY" \
+        --entitlements "$MACOS_DIR/Resources/NativelyMac.entitlements" \
+        "$APP_BUNDLE"
+else
+    echo "    No Apple Development certificate found; using ad-hoc signing with pinned bundle identifier requirement..."
+    codesign --force --deep --sign - \
+        -r='designated => identifier "com.natively.mac"' \
+        --entitlements "$MACOS_DIR/Resources/NativelyMac.entitlements" \
+        "$APP_BUNDLE"
+fi
 
 echo "==> [5/5] Verifying bundle code signature..."
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
