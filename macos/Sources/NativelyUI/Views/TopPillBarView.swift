@@ -7,14 +7,37 @@ import NativelyCore
 public struct TopPillBarView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     public var onCropTrigger: () -> Void = {}
+    public var onWindowDrag: (CGSize, Bool) -> Void = { _, _ in }
     
-    public init(viewModel: OverlayViewModel, onCropTrigger: @escaping () -> Void = {}) {
+    public init(
+        viewModel: OverlayViewModel,
+        onCropTrigger: @escaping () -> Void = {},
+        onWindowDrag: @escaping (CGSize, Bool) -> Void = { _, _ in }
+    ) {
         self.viewModel = viewModel
         self.onCropTrigger = onCropTrigger
+        self.onWindowDrag = onWindowDrag
     }
     
     public var body: some View {
         HStack(spacing: 12) {
+            // Drag Grip Handle (Dedicated drag region to prevent child button interference)
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(NativelyTheme.textTertiary.opacity(0.8))
+                .frame(width: 12, height: 22)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                        .onChanged { gesture in
+                            onWindowDrag(gesture.translation, false)
+                        }
+                        .onEnded { gesture in
+                            onWindowDrag(gesture.translation, true)
+                        }
+                )
+                .help("Drag to reposition overlay")
+            
             // 1. BRAND LOGO BUTTON (Opens Launcher Dashboard)
             Button(action: {
                 viewModel.onOpenLauncher?()
@@ -33,7 +56,8 @@ public struct TopPillBarView: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(NativelyTheme.textPrimary)
                 }
-                .padding(.leading, 4)
+                .padding(.leading, 2)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Open Natively Dashboard")
@@ -63,6 +87,7 @@ public struct TopPillBarView: View {
                     Capsule()
                         .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
                 )
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .help("Show / Hide Overlay (⌘B)")
@@ -127,6 +152,7 @@ public struct TopPillBarView: View {
                     Capsule()
                         .stroke(NativelyTheme.dangerRed.opacity(0.35), lineWidth: 0.5)
                 )
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .help("Stop & End Session (Save Notes & Summary)")

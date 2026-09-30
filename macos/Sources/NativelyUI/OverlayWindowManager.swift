@@ -20,9 +20,17 @@ public final class OverlayWindowManager: ObservableObject {
         self.viewModel = OverlayViewModel(database: database)
     }
     
+    /// Sets stealth mode (screen sharing invisibility).
+    public func setStealthMode(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "natively_undetectable")
+        panel?.setStealthMode(enabled)
+    }
+    
     /// Initializes and presents the stealth overlay panel.
     public func showOverlay() {
+        let isStealth = UserDefaults.standard.object(forKey: "natively_undetectable") as? Bool ?? true
         if let panel {
+            panel.setStealthMode(isStealth)
             panel.orderFront(nil)
             return
         }
@@ -35,6 +43,7 @@ public final class OverlayWindowManager: ObservableObject {
         
         let contentRect = NSRect(x: initialX, y: initialY, width: initialWidth, height: initialHeight)
         let stealthPanel = StealthPanel(contentRect: contentRect)
+        stealthPanel.setStealthMode(isStealth)
         
         // Wrap SwiftUI content in HitTestPassthroughView
         let passthroughContainer = HitTestPassthroughView(frame: NSRect(origin: .zero, size: contentRect.size))
@@ -45,8 +54,8 @@ public final class OverlayWindowManager: ObservableObject {
             onCropTrigger: { [weak self] in
                 self?.handleCropTrigger()
             },
-            onWindowDrag: { [weak self] translation in
-                self?.handleWindowDrag(translation)
+            onWindowDrag: { [weak self] translation, isEnded in
+                self?.handleWindowDrag(translation, isEnded: isEnded)
             }
         )
         
@@ -165,11 +174,19 @@ public final class OverlayWindowManager: ObservableObject {
         hotkeys.onAction(.nudgeRight) { [weak self] in self?.panel?.nudge(dx: 10, dy: 0) }
     }
     
-    private func handleWindowDrag(_ translation: CGSize) {
+    public func handleWindowDrag(_ translation: CGSize, isEnded: Bool = false) {
         guard let panel else { return }
-        var frame = panel.frame
-        frame.origin.x += translation.width
-        frame.origin.y -= translation.height // In Cocoa, Y coordinates increase upwards
-        panel.setFrameOrigin(frame.origin)
+        if initialDragOrigin == nil {
+            initialDragOrigin = panel.frame.origin
+        }
+        if let initial = initialDragOrigin {
+            var origin = initial
+            origin.x += translation.width
+            origin.y -= translation.height // In Cocoa, Y coordinates increase upwards
+            panel.setFrameOrigin(origin)
+        }
+        if isEnded {
+            initialDragOrigin = nil
+        }
     }
 }

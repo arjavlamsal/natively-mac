@@ -451,6 +451,9 @@ public struct SettingsSheetView: View {
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: NativelyTheme.emeraldGreen))
+            .onChange(of: isUndetectable) { _, newValue in
+                OverlayWindowManager.shared.setStealthMode(newValue)
+            }
             .padding(14)
             .background(NativelyTheme.bgCard)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))

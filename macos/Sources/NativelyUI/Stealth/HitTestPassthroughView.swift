@@ -30,4 +30,9 @@ public final class HitTestPassthroughView: NSView {
         
         return super.hitTest(point)
     }
+    
+    /// Allows immediate single-click interactions without requiring prior window activation.
+    public override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        return true
+    }
 }

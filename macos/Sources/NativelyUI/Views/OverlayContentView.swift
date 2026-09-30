@@ -9,14 +9,14 @@ import NativelyCore
 public struct OverlayContentView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     public var onCropTrigger: () -> Void = {}
-    public var onWindowDrag: (CGSize) -> Void = { _ in }
+    public var onWindowDrag: (CGSize, Bool) -> Void = { _, _ in }
     
     @FocusState private var isInputFocused: Bool
     
     public init(
         viewModel: OverlayViewModel,
         onCropTrigger: @escaping () -> Void = {},
-        onWindowDrag: @escaping (CGSize) -> Void = { _ in }
+        onWindowDrag: @escaping (CGSize, Bool) -> Void = { _, _ in }
     ) {
         self.viewModel = viewModel
         self.onCropTrigger = onCropTrigger
@@ -26,13 +26,11 @@ public struct OverlayContentView: View {
     public var body: some View {
         VStack(spacing: 8) {
             // 1. TOP CONTROL PILL
-            TopPillBarView(viewModel: viewModel, onCropTrigger: onCropTrigger)
-                .gesture(
-                    DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                        .onChanged { gesture in
-                            onWindowDrag(gesture.translation)
-                        }
-                )
+            TopPillBarView(
+                viewModel: viewModel,
+                onCropTrigger: onCropTrigger,
+                onWindowDrag: onWindowDrag
+            )
             
             // 2. EXPANDED MEETING INTERFACE
             if viewModel.isExpanded {

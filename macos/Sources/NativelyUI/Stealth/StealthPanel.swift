@@ -25,7 +25,7 @@ public final class StealthPanel: NSPanel {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.hasShadow = false
-        self.isMovableByWindowBackground = false
+        self.isMovableByWindowBackground = true
         self.hidesOnDeactivate = false
     }
     
@@ -38,6 +38,11 @@ public final class StealthPanel: NSPanel {
     /// Never steals the main window status from the user's active IDE, terminal, or browser.
     public override var canBecomeMain: Bool {
         return false
+    }
+    
+    /// Sets hardware screen-share stealth (sharingType = .none or .readOnly)
+    public func setStealthMode(_ enabled: Bool) {
+        self.sharingType = enabled ? .none : .readOnly
     }
     
     /// Nudge the panel by delta points (used by global stealth hotkeys Cmd+Shift+Arrows)

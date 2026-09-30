@@ -41,8 +41,8 @@ public final class AppCoordinator: ObservableObject {
     ) {
         self.database = database
         self.companionServer = CompanionServer(port: companionPort)
-        self.overlayWindowManager = overlayWindowManager ?? OverlayWindowManager(database: database)
-        self.launcherWindowManager = launcherWindowManager ?? LauncherWindowManager(database: database)
+        self.overlayWindowManager = overlayWindowManager ?? (database === AppDatabase.shared ? .shared : OverlayWindowManager(database: database))
+        self.launcherWindowManager = launcherWindowManager ?? (database === AppDatabase.shared ? .shared : LauncherWindowManager(database: database))
         self.menuBarController = MenuBarController.shared
         self.permissionsManager = PermissionsManager.shared
         self.hotkeyManager = HotkeyManager.shared
@@ -68,6 +68,16 @@ public final class AppCoordinator: ObservableObject {
         }
         overlayWindowManager.viewModel.onCropTrigger = { [weak self] in
             self?.overlayWindowManager.handleCropTrigger()
+        }
+        
+        // Wire Launcher Dashboard Meeting Actions
+        launcherWindowManager.viewModel.onStartMeeting = { [weak self] in
+            self?.startMeetingSession()
+        }
+        launcherWindowManager.viewModel.onStopMeeting = { [weak self] in
+            Task {
+                _ = await self?.stopMeetingSession()
+            }
         }
         
         // 2. Setup System Menu Bar
@@ -203,12 +213,19 @@ public final class AppCoordinator: ObservableObject {
     }
     
     public func startMeetingSession(title: String = "Meeting") {
-        let meetingId = "m-\(UUID().uuidString.prefix(8))"
+        let meetingId = "mtg-\(UUID().uuidString.prefix(8))"
+        let displayTitle = (title == "Meeting") ? "Meeting - \(Date().formatted(date: .abbreviated, time: .shortened))" : title
         let meeting = Meeting(
             id: meetingId,
-            title: title,
+            title: displayTitle,
+            startTime: Int64(Date().timeIntervalSince1970 * 1000),
+            durationMs: 0,
+            summaryJson: nil,
             createdAt: ISO8601DateFormatter().string(from: Date()),
-            source: "native"
+            calendarEventId: nil,
+            source: "native",
+            isProcessed: true,
+            summaryStatus: "recording"
         )
         
         try? database.saveMeeting(meeting)
@@ -216,9 +233,28 @@ public final class AppCoordinator: ObservableObject {
         self.meetingStartTime = Date()
         self.isMeetingActive = true
         
-        overlayWindowManager.viewModel.currentMeetingId = meetingId
-        menuBarController.setMeetingState(isActive: true, title: title)
+        // 1. Sync Launcher Dashboard State
+        launcherWindowManager.viewModel.isMeetingActive = true
+        launcherWindowManager.viewModel.activeMeetingId = meetingId
+        launcherWindowManager.viewModel.loadMeetings()
+        launcherWindowManager.viewModel.selectMeeting(meeting)
         
+        // 2. Sync Companion Server
+        companionServer.isMeetingActive = true
+        
+        // 3. Enforce Hardware Stealth Mode (sharingType = .none)
+        UserDefaults.standard.set(true, forKey: "natively_undetectable")
+        overlayWindowManager.setStealthMode(true)
+        
+        // 4. Automatically Show & Expand Stealth Overlay
+        overlayWindowManager.viewModel.currentMeetingId = meetingId
+        overlayWindowManager.viewModel.isExpanded = true
+        overlayWindowManager.showOverlay()
+        
+        // 5. Update System Menu Bar
+        menuBarController.setMeetingState(isActive: true, title: displayTitle)
+        
+        // 6. Start Native Dual-Channel Audio Capture
         Task { [weak self] in
             try? await self?.audioCoordinator.startMeeting(id: meetingId)
         }
@@ -227,26 +263,38 @@ public final class AppCoordinator: ObservableObject {
     public func stopMeetingSession() async -> Meeting? {
         guard isMeetingActive, var meeting = activeMeeting else { return nil }
         
-        await audioCoordinator.stopMeeting()
+        // 1. Immediately update reactive UI state and persist completed status on MainActor
+        self.isMeetingActive = false
+        self.activeMeeting = nil
+        let startTime = self.meetingStartTime
+        self.meetingStartTime = nil
         
         let durationMs: Int64
-        if let startTime = meetingStartTime {
+        if let startTime {
             durationMs = Int64(Date().timeIntervalSince(startTime) * 1000)
         } else {
             durationMs = 0
         }
-        
         meeting.durationMs = durationMs
+        meeting.summaryStatus = "completed"
         try? database.saveMeeting(meeting)
         
-        self.isMeetingActive = false
-        self.activeMeeting = nil
-        self.meetingStartTime = nil
+        launcherWindowManager.viewModel.isMeetingActive = false
+        launcherWindowManager.viewModel.activeMeetingId = nil
+        launcherWindowManager.viewModel.loadMeetings()
+        launcherWindowManager.viewModel.selectMeeting(meeting)
         
         overlayWindowManager.viewModel.currentMeetingId = nil
+        withAnimation(NativelyTheme.smoothSpring) {
+            overlayWindowManager.viewModel.isExpanded = false
+        }
+        companionServer.isMeetingActive = false
         menuBarController.setMeetingState(isActive: false)
         
-        // Auto-index meeting transcripts into semantic vector chunks for RAG
+        // 2. Stop Audio Recording in background
+        await audioCoordinator.stopMeeting()
+        
+        // 8. Auto-index meeting transcripts into semantic vector chunks for RAG
         let turns = (try? database.fetchTranscripts(for: meeting.id)) ?? []
         if !turns.isEmpty {
             let chunks = SemanticChunker.chunkTranscripts(turns)
@@ -264,8 +312,6 @@ public final class AppCoordinator: ObservableObject {
             try? database.saveVectorChunks(vectorChunks)
         }
         
-        // Refresh launcher list
-        launcherWindowManager.viewModel.loadMeetings()
         return meeting
     }
     

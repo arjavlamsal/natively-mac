@@ -52,6 +52,9 @@ public struct LauncherDashboardView: View {
                 isPulsing = true
             }
         }
+        .onChange(of: isUndetectable) { _, newValue in
+            OverlayWindowManager.shared.setStealthMode(newValue)
+        }
     }
     
     // MARK: - 1. Top Header Bar

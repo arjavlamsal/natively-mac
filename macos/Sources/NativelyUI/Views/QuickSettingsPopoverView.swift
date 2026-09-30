@@ -36,6 +36,9 @@ public struct QuickSettingsPopoverView: View {
                 }
             }
             .toggleStyle(SwitchToggleStyle(tint: .green))
+            .onChange(of: isUndetectable) { _, newValue in
+                OverlayWindowManager.shared.setStealthMode(newValue)
+            }
             
             Divider()
                 .opacity(0.4)

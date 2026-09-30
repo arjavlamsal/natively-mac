@@ -86,6 +86,50 @@ struct AppCoordinatorTests {
         coordinator.shutdown()
     }
     
+    @Test("Launcher Start Natively auto-shows overlay, enforces stealth, and overlay Stop button ends session")
+    @MainActor
+    func testLauncherAndOverlayButtonLifecycle() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let coordinator = AppCoordinator(database: db, companionPort: 4195)
+        coordinator.start()
+        
+        #expect(coordinator.isMeetingActive == false)
+        #expect(coordinator.launcherWindowManager.viewModel.isMeetingActive == false)
+        
+        // 1. User clicks "Start Natively" in Launcher
+        coordinator.launcherWindowManager.viewModel.startMeeting()
+        
+        #expect(coordinator.isMeetingActive == true)
+        #expect(coordinator.launcherWindowManager.viewModel.isMeetingActive == true)
+        #expect(coordinator.launcherWindowManager.viewModel.activeMeetingId != nil)
+        #expect(coordinator.overlayWindowManager.viewModel.isExpanded == true)
+        #expect(coordinator.overlayWindowManager.panel != nil)
+        #expect(coordinator.overlayWindowManager.panel?.sharingType == NSWindow.SharingType.none)
+        
+        // 2. User clicks red Stop button in Overlay TopPill
+        guard let onEndMeeting = coordinator.overlayWindowManager.viewModel.onEndMeeting else {
+            Issue.record("Expected onEndMeeting callback to be wired by AppCoordinator")
+            return
+        }
+        
+        onEndMeeting()
+        
+        // Allow brief time for async stop meeting task
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        
+        #expect(coordinator.isMeetingActive == false)
+        #expect(coordinator.launcherWindowManager.viewModel.isMeetingActive == false)
+        #expect(coordinator.launcherWindowManager.viewModel.activeMeetingId == nil)
+        #expect(coordinator.overlayWindowManager.viewModel.isExpanded == false)
+        
+        // Verify database holds completed meeting
+        let allMeetings = try db.fetchAllMeetings()
+        #expect(!allMeetings.isEmpty)
+        #expect(allMeetings.first?.summaryStatus == "completed")
+        
+        coordinator.shutdown()
+    }
+    
     @Test("Companion DOM context callback feeds active overlay context")
     @MainActor
     func testCompanionDOMHookup() async throws {

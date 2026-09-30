@@ -123,6 +123,10 @@ public final class LauncherViewModel: ObservableObject {
         return groups
     }
     
+    // Meeting Lifecycle Callbacks (Wired to AppCoordinator)
+    public var onStartMeeting: (@MainActor () -> Void)?
+    public var onStopMeeting: (@MainActor () -> Void)?
+    
     /// Toggles the active meeting session.
     public func toggleMeetingSession() {
         if isMeetingActive {
@@ -133,6 +137,11 @@ public final class LauncherViewModel: ObservableObject {
     }
     
     public func startMeeting() {
+        if let onStartMeeting {
+            onStartMeeting()
+            return
+        }
+        
         let meetingId = "mtg-\(UUID().uuidString)"
         self.activeMeetingId = meetingId
         self.isMeetingActive = true
@@ -156,6 +165,11 @@ public final class LauncherViewModel: ObservableObject {
     }
     
     public func stopMeeting() {
+        if let onStopMeeting {
+            onStopMeeting()
+            return
+        }
+        
         guard let activeId = activeMeetingId else { return }
         self.isMeetingActive = false
         self.companionServer.isMeetingActive = false
