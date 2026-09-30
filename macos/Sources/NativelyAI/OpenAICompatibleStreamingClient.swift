@@ -126,12 +126,30 @@ public final class OpenAICompatibleStreamingClient: StreamingAIProvider, Sendabl
     }
     
     private func handleEvent(_ event: SSEEvent, continuation: AsyncThrowingStream<String, Error>.Continuation) -> Bool {
-        let dataStr = event.data.trimmingCharacters(in: .whitespacesAndNewlines)
-        if dataStr == "[DONE]" {
+        if handleSinglePayload(event.data, continuation: continuation) {
             return true
         }
         
-        guard let eventData = dataStr.data(using: .utf8),
+        let lines = event.data.components(separatedBy: "\n")
+        var anyEmitted = false
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || trimmed == "[DONE]" || trimmed == "data: [DONE]" { continue }
+            let payload = trimmed.hasPrefix("data:") ? String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces) : trimmed
+            if handleSinglePayload(payload, continuation: continuation) {
+                anyEmitted = true
+            }
+        }
+        return anyEmitted
+    }
+    
+    private func handleSinglePayload(_ dataStr: String, continuation: AsyncThrowingStream<String, Error>.Continuation) -> Bool {
+        let trimmed = dataStr.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "[DONE]" {
+            return true
+        }
+        
+        guard let eventData = trimmed.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let first = choices.first,
@@ -141,6 +159,7 @@ public final class OpenAICompatibleStreamingClient: StreamingAIProvider, Sendabl
         
         if let content = delta["content"] as? String {
             continuation.yield(content)
+            return true
         }
         return false
     }

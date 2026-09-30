@@ -18,7 +18,7 @@ public struct SSEParser: Sendable {
     public init() {}
     
     /// Feeds a single incoming line from an SSE stream.
-    /// Returns an `SSEEvent` when an event delimiter (empty line) is encountered.
+    /// Returns an `SSEEvent` when an event delimiter (empty line) or a new self-contained data frame is encountered.
     public mutating func feed(line: String) -> SSEEvent? {
         let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
         
@@ -34,12 +34,34 @@ public struct SSEParser: Sendable {
         }
         
         if line.hasPrefix("event:") {
+            var previousEvent: SSEEvent? = nil
+            if !currentData.isEmpty {
+                previousEvent = SSEEvent(event: currentEvent, data: currentData.joined(separator: "\n"))
+                currentData.removeAll()
+            }
             currentEvent = line.dropFirst(6).trimmingCharacters(in: .whitespaces)
+            return previousEvent
         } else if line.hasPrefix("data:") {
             var payload = String(line.dropFirst(5))
             if payload.hasPrefix(" ") {
                 payload.removeFirst()
             }
+            
+            let trimmedPayload = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // If there was prior data and another data: line arrives without an empty line, flush prior data
+            if !currentData.isEmpty {
+                let prior = currentData.joined(separator: "\n")
+                currentData = [payload]
+                let event = SSEEvent(event: currentEvent, data: prior)
+                return event
+            }
+            
+            // Fast-path: If incoming line is a self-contained complete JSON or [DONE] with no pending event header, emit immediately
+            if currentEvent == nil && ((trimmedPayload.hasPrefix("{") && trimmedPayload.hasSuffix("}")) || trimmedPayload == "[DONE]") {
+                return SSEEvent(event: nil, data: payload)
+            }
+            
             currentData.append(payload)
         }
         

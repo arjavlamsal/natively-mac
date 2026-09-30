@@ -80,13 +80,13 @@ public final class OverlayViewModel: ObservableObject {
     @Published public var messages: [OverlayMessage] = []
     @Published public var isAIStreaming: Bool = false
     @Published public var currentAIText: String = ""
-    @Published public var currentProviderName: String = "Gemini 3.8 Flash"
+    @Published public var currentProviderName: String = "Gemini 3.5 Flash Lite"
     @Published public var ttftLatencyMs: Double? = nil
     
     public static let defaultModels: [AIModelInfo] = [
         // Google Gemini
-        AIModelInfo(id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", provider: "Google", providerType: .googleGemini, subtitle: "Ultra-fast multimodal reasoning", isFast: true),
-        AIModelInfo(id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", provider: "Google", providerType: .googleGemini, subtitle: "Lightweight, lowest latency", isFast: true),
+        AIModelInfo(id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", provider: "Google", providerType: .googleGemini, subtitle: "Ultra-fast lowest latency", isFast: true),
+        AIModelInfo(id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", provider: "Google", providerType: .googleGemini, subtitle: "Next-gen multimodal reasoning", isFast: true),
         AIModelInfo(id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", provider: "Google", providerType: .googleGemini, subtitle: "Frontier reasoning & complex logic"),
         
         // Anthropic Claude
@@ -322,6 +322,13 @@ public final class OverlayViewModel: ObservableObject {
                             ttftTimeoutSeconds: 4.5
                         )
                     ]
+                    
+                    // If Gemini selected, include sibling flash model as immediate second rung
+                    if chosen.providerType == .googleGemini {
+                        let backupModel = (chosen.id == "gemini-3.5-flash-lite") ? "gemini-3.8-flash" : "gemini-3.5-flash-lite"
+                        dynamicLadder.append(FallbackRung(providerType: .googleGemini, model: backupModel, ttftTimeoutSeconds: 4.5))
+                    }
+                    
                     for rung in FallbackLadderEngine.defaultLadder {
                         if rung.providerType != chosen.providerType {
                             dynamicLadder.append(rung)

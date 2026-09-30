@@ -94,7 +94,14 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
                         for try await line in asyncBytes.lines {
                             errorBody += line
                         }
-                        continuation.finish(throwing: AIClientError.httpError(statusCode: httpResponse.statusCode, body: errorBody))
+                        var userFacingMsg = errorBody
+                        if let bodyData = errorBody.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+                           let errObj = json["error"] as? [String: Any],
+                           let msg = errObj["message"] as? String {
+                            userFacingMsg = msg
+                        }
+                        continuation.finish(throwing: AIClientError.httpError(statusCode: httpResponse.statusCode, body: userFacingMsg))
                         return
                     }
                     
@@ -102,6 +109,19 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
                     var hasEmittedAnyChunk = false
                     
                     for try await line in asyncBytes.lines {
+                        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmed.isEmpty || trimmed == "data: [DONE]" { continue }
+                        
+                        // Fast path: if the line directly starts with data:, parse it immediately without buffering!
+                        if trimmed.hasPrefix("data:") {
+                            let jsonString = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                            if handleSinglePayload(jsonString, continuation: continuation) {
+                                hasEmittedAnyChunk = true
+                                continue
+                            }
+                        }
+                        
+                        // Fallback through SSEParser
                         if let event = parser.feed(line: line) {
                             if handleEvent(event, continuation: continuation) {
                                 hasEmittedAnyChunk = true
@@ -128,7 +148,27 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
     
     @discardableResult
     private func handleEvent(_ event: SSEEvent, continuation: AsyncThrowingStream<String, Error>.Continuation) -> Bool {
-        guard let eventData = event.data.data(using: .utf8),
+        if handleSinglePayload(event.data, continuation: continuation) {
+            return true
+        }
+        
+        // If event.data contains multiple lines (e.g. joined by SSEParser), handle each line individually
+        let lines = event.data.components(separatedBy: "\n")
+        var anyEmitted = false
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || trimmed == "[DONE]" || trimmed == "data: [DONE]" { continue }
+            let payload = trimmed.hasPrefix("data:") ? String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces) : trimmed
+            if handleSinglePayload(payload, continuation: continuation) {
+                anyEmitted = true
+            }
+        }
+        return anyEmitted
+    }
+    
+    @discardableResult
+    private func handleSinglePayload(_ payload: String, continuation: AsyncThrowingStream<String, Error>.Continuation) -> Bool {
+        guard let eventData = payload.data(using: .utf8),
               let rawJson = try? JSONSerialization.jsonObject(with: eventData) else {
             return false
         }
