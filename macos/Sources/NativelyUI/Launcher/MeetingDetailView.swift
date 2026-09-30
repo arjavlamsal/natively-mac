@@ -15,6 +15,7 @@ public struct MeetingDetailView: View {
     @State private var transcriptFilter: String = ""
     @State private var chatQuery: String = ""
     @State private var showDeleteConfirmation: Bool = false
+    @State private var showFollowUpSheet: Bool = false
     
     public init(viewModel: LauncherViewModel, meeting: Meeting) {
         self.viewModel = viewModel
@@ -65,6 +66,9 @@ public struct MeetingDetailView: View {
         .onChange(of: meeting.id) { _, _ in
             editableTitle = meeting.title ?? "Untitled Meeting"
             viewModel.meetingChatMessages.removeAll()
+        }
+        .sheet(isPresented: $showFollowUpSheet) {
+            FollowUpDraftSheet(meeting: meeting)
         }
     }
     
@@ -176,9 +180,25 @@ public struct MeetingDetailView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 
+                // Draft Follow-Up
+                Button(action: { showFollowUpSheet = true }) {
+                    Label("Draft Follow-Up", systemImage: "envelope.badge")
+                        .font(.system(size: 11.5, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
                 // Export PDF
                 Button(action: exportPDF) {
                     Label("Export PDF", systemImage: "arrow.down.doc")
+                        .font(.system(size: 11.5, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
+                // Export TXT
+                Button(action: exportPlainText) {
+                    Label("Export TXT", systemImage: "doc.text")
                         .font(.system(size: 11.5, weight: .medium))
                 }
                 .buttonStyle(.bordered)
@@ -592,6 +612,19 @@ public struct MeetingDetailView: View {
                 
                 let pdfData = printView.dataWithPDF(inside: printView.bounds)
                 try? pdfData.write(to: url)
+            }
+        }
+    }
+    
+    private func exportPlainText() {
+        let txt = viewModel.exportMeetingPlainText(meeting)
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.plainText]
+        savePanel.nameFieldStringValue = "\(meeting.title ?? "Meeting").txt"
+        
+        savePanel.begin { response in
+            if response == .OK, let url = savePanel.url {
+                try? txt.write(to: url, atomically: true, encoding: .utf8)
             }
         }
     }

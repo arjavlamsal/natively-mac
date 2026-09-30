@@ -36,6 +36,11 @@ public final class LauncherViewModel: ObservableObject {
     @Published public var isMeetingActive: Bool = false
     @Published public var activeMeetingId: String? = nil
     @Published public var isSettingsPresented: Bool = false
+    @Published public var settingsSelectedTab: String = "ai-providers"
+    @Published public var modes: [Mode] = []
+    
+    // Services
+    public let documentIngestionService: DocumentIngestionService
     
     // Settings State
     @Published public var anthropicKey: String = ""
@@ -51,9 +56,12 @@ public final class LauncherViewModel: ObservableObject {
         self.database = database
         self.companionServer = companionServer
         self.ragRetriever = RAGRetriever(database: database)
+        self.documentIngestionService = DocumentIngestionService(database: database)
         
+        try? database.seedDefaultModesIfEmpty()
         loadMeetings()
         loadKeychainKeys()
+        loadModes()
         
         // Start companion micro-server
         try? companionServer.start()
@@ -125,6 +133,7 @@ public final class LauncherViewModel: ObservableObject {
     
     // Meeting Lifecycle Callbacks (Wired to AppCoordinator)
     public var onStartMeeting: (@MainActor () -> Void)?
+    public var onStartMeetingWithTitle: (@MainActor (String) -> Void)?
     public var onStopMeeting: (@MainActor () -> Void)?
     
     /// Toggles the active meeting session.
@@ -136,7 +145,11 @@ public final class LauncherViewModel: ObservableObject {
         }
     }
     
-    public func startMeeting() {
+    public func startMeeting(title: String? = nil) {
+        if let title, let onStartMeetingWithTitle {
+            onStartMeetingWithTitle(title)
+            return
+        }
         if let onStartMeeting {
             onStartMeeting()
             return
@@ -147,9 +160,10 @@ public final class LauncherViewModel: ObservableObject {
         self.isMeetingActive = true
         self.companionServer.isMeetingActive = true
         
+        let meetingTitle = title ?? "Meeting - \(Date().formatted(date: .abbreviated, time: .shortened))"
         let newMeeting = Meeting(
             id: meetingId,
-            title: "Meeting - \(Date().formatted(date: .abbreviated, time: .shortened))",
+            title: meetingTitle,
             startTime: Int64(Date().timeIntervalSince1970 * 1000),
             durationMs: 0,
             summaryJson: nil,
@@ -327,5 +341,62 @@ public final class LauncherViewModel: ObservableObject {
         }
         
         return doc
+    }
+    
+    /// Formats meeting content into plain text transcript for export.
+    public func exportMeetingPlainText(_ meeting: Meeting) -> String {
+        var text = "\(meeting.title ?? "Meeting")\n"
+        text += "Date: \(meeting.createdAt ?? "")\n\n"
+        
+        for turn in selectedMeetingTranscripts {
+            text += "[\(turn.speaker)]: \(turn.content)\n"
+        }
+        return text
+    }
+    
+    // MARK: - Modes Management
+    
+    public func loadModes() {
+        do {
+            self.modes = try database.fetchModes()
+        } catch {
+            self.modes = []
+        }
+    }
+    
+    public func saveCustomMode(name: String, prompt: String, description: String? = nil) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, !trimmedPrompt.isEmpty else { return }
+        
+        let modeId = "mode-custom-\(UUID().uuidString.prefix(8).lowercased())"
+        let mode = Mode(
+            id: modeId,
+            name: trimmedName,
+            prompt: trimmedPrompt,
+            isCustom: true,
+            isActive: false,
+            description: description
+        )
+        try? database.saveMode(mode)
+        loadModes()
+    }
+    
+    public func deleteMode(_ mode: Mode) {
+        guard mode.isCustom else { return }
+        try? database.deleteMode(id: mode.id)
+        loadModes()
+    }
+    
+    public func setActiveMode(_ mode: Mode) {
+        try? database.setActiveMode(id: mode.id)
+        loadModes()
+    }
+    
+    // MARK: - Document Ingestion
+    
+    public func importReferenceDocument(from url: URL, meetingId: String? = nil) async throws -> Int {
+        let count = try await documentIngestionService.ingestDocument(at: url, meetingId: meetingId)
+        return count
     }
 }

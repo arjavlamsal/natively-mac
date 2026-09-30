@@ -1,5 +1,8 @@
 import SwiftUI
 import NativelySecurity
+import NativelyAudio
+import NativelyCore
+import UniformTypeIdentifiers
 
 /// Settings modal replicating the original Natively SettingsOverlay layout.
 /// Features a dark sidebar with icon navigation, header with close action,
@@ -14,12 +17,20 @@ public struct SettingsSheetView: View {
     // Audio Settings
     @AppStorage("natively_stt_engine") private var sttEngine: String = "whisperkit"
     @AppStorage("natively_vad_threshold") private var vadThreshold: Double = 0.5
+    @AppStorage("natively_selected_mic") private var selectedMicId: String = "default"
     
     // Stealth Settings
     @AppStorage("natively_undetectable") private var isUndetectable: Bool = true
     
     // Profile Intelligence
     @AppStorage("natively_profile_context") private var profileContext: String = ""
+    @State private var documentIngestStatus: String? = nil
+    
+    // Custom Modes
+    @State private var showCreateMode: Bool = false
+    @State private var newModeName: String = ""
+    @State private var newModePrompt: String = ""
+    @State private var newModeDesc: String = ""
     
     public init(viewModel: LauncherViewModel) {
         self.viewModel = viewModel
@@ -51,6 +62,8 @@ public struct SettingsSheetView: View {
                             generalSection
                         case "ai-providers":
                             aiProvidersSection
+                        case "modes":
+                            modesSection
                         case "audio":
                             audioDevicesSection
                         case "stealth":
@@ -74,6 +87,10 @@ public struct SettingsSheetView: View {
             .background(NativelyTheme.bgPrimary)
         }
         .frame(width: 820, height: 580)
+        .onAppear {
+            selectedTab = viewModel.settingsSelectedTab
+            viewModel.loadModes()
+        }
     }
     
     // MARK: - Left Sidebar
@@ -117,6 +134,7 @@ public struct SettingsSheetView: View {
                 VStack(spacing: 2) {
                     sidebarNavItem(id: "general", label: "General", icon: "gearshape")
                     sidebarNavItem(id: "ai-providers", label: "AI Providers", icon: "brain.head.profile")
+                    sidebarNavItem(id: "modes", label: "Modes & Prompts", icon: "square.grid.2x2")
                     sidebarNavItem(id: "audio", label: "Audio & Devices", icon: "waveform")
                     sidebarNavItem(id: "stealth", label: "Stealth Mode", icon: "shield.lefthalf.filled")
                     sidebarNavItem(id: "keybinds", label: "Keybinds", icon: "keyboard")
@@ -202,6 +220,7 @@ public struct SettingsSheetView: View {
         switch selectedTab {
         case "general": return "General Preferences"
         case "ai-providers": return "AI Providers & Credentials"
+        case "modes": return "Modes & System Prompts"
         case "audio": return "Audio Capture & STT"
         case "stealth": return "Hardware Stealth & Isolation"
         case "keybinds": return "Global Keyboard Shortcuts"
@@ -216,6 +235,7 @@ public struct SettingsSheetView: View {
         switch selectedTab {
         case "general": return "Application behavior, startup, and interface appearance"
         case "ai-providers": return "Configure custom API keys stored securely in macOS Keychain"
+        case "modes": return "Configure built-in personas or create tailored custom prompts"
         case "audio": return "Select speech recognition engines, audio channels, and VAD thresholds"
         case "stealth": return "Hardware-level window isolation parameters"
         case "keybinds": return "Quick trigger hotkeys for overlays, cropping, and instant presets"
@@ -320,6 +340,191 @@ public struct SettingsSheetView: View {
         )
     }
     
+    // MARK: - Modes Section
+    
+    private var modesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Top Bar: Active Mode & Create Button
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ACTIVE COPILOT MODE")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(NativelyTheme.textTertiary)
+                    
+                    if let active = viewModel.modes.first(where: { $0.isActive }) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(NativelyTheme.emeraldGreen)
+                                .frame(width: 8, height: 8)
+                            Text(active.name)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(NativelyTheme.textPrimary)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    withAnimation {
+                        showCreateMode.toggle()
+                    }
+                }) {
+                    HStack(spacing: 5) {
+                        Image(systemName: showCreateMode ? "xmark" : "plus")
+                        Text(showCreateMode ? "Cancel" : "New Custom Mode")
+                    }
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundColor(NativelyTheme.skyAccent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(NativelyTheme.skyAccent.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(14)
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(NativelyTheme.borderSubtle, lineWidth: 0.5)
+            )
+            
+            // Create New Mode Card (Collapsible)
+            if showCreateMode {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("CREATE NEW CUSTOM MODE")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(NativelyTheme.skyAccent)
+                    
+                    TextField("Mode Name (e.g. System Design Expert)", text: $newModeName)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12.5))
+                    
+                    TextField("Description (e.g. Tailored for senior architecture interviews)", text: $newModeDesc)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12))
+                    
+                    Text("SYSTEM PROMPT")
+                        .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                        .foregroundColor(NativelyTheme.textTertiary)
+                    
+                    TextEditor(text: $newModePrompt)
+                        .font(.system(size: 11.5, design: .monospaced))
+                        .frame(height: 100)
+                        .padding(6)
+                        .background(NativelyTheme.bgElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
+                        )
+                    
+                    HStack {
+                        Spacer()
+                        Button("Save Mode") {
+                            viewModel.saveCustomMode(name: newModeName, prompt: newModePrompt, description: newModeDesc.isEmpty ? nil : newModeDesc)
+                            newModeName = ""
+                            newModePrompt = ""
+                            newModeDesc = ""
+                            showCreateMode = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newModePrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+                .padding(14)
+                .background(NativelyTheme.bgCard)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(NativelyTheme.skyAccent.opacity(0.3), lineWidth: 0.5)
+                )
+            }
+            
+            // Modes List
+            VStack(spacing: 8) {
+                ForEach(viewModel.modes) { mode in
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(mode.name)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(NativelyTheme.textPrimary)
+                                
+                                if mode.isActive {
+                                    Text("ACTIVE")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(NativelyTheme.emeraldGreen)
+                                        .padding(.horizontal, 4.5)
+                                        .padding(.vertical, 1.5)
+                                        .background(NativelyTheme.emeraldGreen.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
+                                
+                                if mode.isCustom {
+                                    Text("CUSTOM")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(NativelyTheme.purpleAccent)
+                                        .padding(.horizontal, 4.5)
+                                        .padding(.vertical, 1.5)
+                                        .background(NativelyTheme.purpleAccent.opacity(0.12))
+                                        .clipShape(Capsule())
+                                } else {
+                                    Text("BUILT-IN")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(NativelyTheme.textTertiary)
+                                        .padding(.horizontal, 4.5)
+                                        .padding(.vertical, 1.5)
+                                        .background(Color.white.opacity(0.06))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                            
+                            if let desc = mode.description {
+                                Text(desc)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(NativelyTheme.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        if !mode.isActive {
+                            Button("Set Active") {
+                                viewModel.setActiveMode(mode)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        
+                        if mode.isCustom {
+                            Button(role: .destructive, action: {
+                                viewModel.deleteMode(mode)
+                            }) {
+                                Image(systemName: "trash")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.red.opacity(0.8))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 4)
+                        }
+                    }
+                    .padding(12)
+                    .background(NativelyTheme.bgCard)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(mode.isActive ? NativelyTheme.emeraldGreen.opacity(0.4) : NativelyTheme.borderSubtle, lineWidth: 0.5)
+                    )
+                }
+            }
+        }
+    }
+    
     // MARK: - Audio & Devices Section
     
     private var audioDevicesSection: some View {
@@ -337,6 +542,34 @@ public struct SettingsSheetView: View {
                 }
                 .pickerStyle(.radioGroup)
                 .foregroundColor(NativelyTheme.textPrimary)
+            }
+            .padding(14)
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(NativelyTheme.borderSubtle, lineWidth: 0.5)
+            )
+            
+            // Microphone Hardware Device Picker
+            VStack(alignment: .leading, spacing: 10) {
+                Text("MICROPHONE HARDWARE INPUT")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(NativelyTheme.textTertiary)
+                
+                Picker("", selection: $selectedMicId) {
+                    ForEach(AudioDeviceManager.shared.getAvailableMicrophones()) { device in
+                        HStack {
+                            Text(device.name)
+                            if device.isBuiltIn {
+                                Text("(Built-in)").foregroundColor(.secondary)
+                            }
+                        }
+                        .tag(device.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
             }
             .padding(14)
             .background(NativelyTheme.bgCard)
@@ -556,22 +789,71 @@ public struct SettingsSheetView: View {
             .padding(14)
             .background(NativelyTheme.bgCard)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            
+            // Phone Mirror QR Code
+            VStack(alignment: .leading, spacing: 10) {
+                Text("MOBILE PHONE MIRROR")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(NativelyTheme.textTertiary)
+                
+                HStack(alignment: .center, spacing: 16) {
+                    QRCodeView(content: "http://127.0.0.1:\(viewModel.companionServer.port)/phone?token=\(viewModel.companionServer.pairingToken)")
+                        .frame(width: 96, height: 96)
+                        .padding(6)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Scan to Mirror Live on Mobile")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundColor(NativelyTheme.textPrimary)
+                        Text("Point your iPhone or Android camera at this QR code to view live AI solutions, interview notes, and suggestions directly on your phone.")
+                            .font(.system(size: 11))
+                            .foregroundColor(NativelyTheme.textSecondary)
+                            .lineSpacing(2)
+                    }
+                }
+            }
+            .padding(14)
+            .background(NativelyTheme.bgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
     
     // MARK: - Profile Section
     
     private var profileSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Paste your resume, technical background, work experience, or bio below. Natively automatically injects this context so AI responses accurately reflect your true background.")
                 .font(.system(size: 12))
                 .foregroundColor(NativelyTheme.textSecondary)
                 .lineSpacing(2)
             
+            // Document Ingestion Action
+            HStack(spacing: 10) {
+                Button(action: importReferenceDocument) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.badge.plus")
+                            .font(.system(size: 12))
+                        Text("Import Document (.pdf, .txt, .md)")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                
+                if let status = documentIngestStatus {
+                    Text(status)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(NativelyTheme.emeraldGreen)
+                }
+            }
+            .padding(.vertical, 2)
+            
             TextEditor(text: $profileContext)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundColor(NativelyTheme.textPrimary)
-                .frame(minHeight: 240)
+                .frame(minHeight: 220)
                 .padding(10)
                 .background(NativelyTheme.bgCard)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -579,6 +861,34 @@ public struct SettingsSheetView: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
                 )
+        }
+    }
+    
+    private func importReferenceDocument() {
+        let openPanel = NSOpenPanel()
+        openPanel.allowedContentTypes = [.pdf, .plainText]
+        openPanel.allowsMultipleSelection = false
+        openPanel.canChooseDirectories = false
+        openPanel.canChooseFiles = true
+        
+        openPanel.begin { response in
+            if response == .OK, let url = openPanel.url {
+                Task {
+                    do {
+                        let count = try await viewModel.importReferenceDocument(from: url)
+                        await MainActor.run {
+                            documentIngestStatus = "Imported \(count) chunk(s) from \(url.lastPathComponent)"
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                                documentIngestStatus = nil
+                            }
+                        }
+                    } catch {
+                        await MainActor.run {
+                            documentIngestStatus = "Error: \(error.localizedDescription)"
+                        }
+                    }
+                }
+            }
         }
     }
     

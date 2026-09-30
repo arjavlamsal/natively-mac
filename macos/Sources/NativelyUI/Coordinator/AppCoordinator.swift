@@ -74,6 +74,9 @@ public final class AppCoordinator: ObservableObject {
         launcherWindowManager.viewModel.onStartMeeting = { [weak self] in
             self?.startMeetingSession()
         }
+        launcherWindowManager.viewModel.onStartMeetingWithTitle = { [weak self] title in
+            self?.startMeetingSession(title: title)
+        }
         launcherWindowManager.viewModel.onStopMeeting = { [weak self] in
             Task {
                 _ = await self?.stopMeetingSession()

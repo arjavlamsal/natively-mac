@@ -123,6 +123,7 @@ public struct LauncherDashboardView: View {
             // Right: Profile, Modes & Settings Buttons
             HStack(spacing: 4) {
                 Button(action: {
+                    viewModel.settingsSelectedTab = "profile"
                     viewModel.isSettingsPresented = true
                 }) {
                     Image(systemName: "person.crop.circle")
@@ -136,6 +137,7 @@ public struct LauncherDashboardView: View {
                 .help("Profile Intelligence")
                 
                 Button(action: {
+                    viewModel.settingsSelectedTab = "modes"
                     viewModel.isSettingsPresented = true
                 }) {
                     Image(systemName: "square.grid.2x2")
@@ -149,6 +151,7 @@ public struct LauncherDashboardView: View {
                 .help("Modes & Prompts")
                 
                 Button(action: {
+                    viewModel.settingsSelectedTab = "general"
                     viewModel.isSettingsPresented = true
                 }) {
                     Image(systemName: "gearshape")
@@ -374,42 +377,10 @@ public struct LauncherDashboardView: View {
                     .stroke(NativelyTheme.borderMuted, lineWidth: 0.5)
             )
             
-            // Card 2: Upcoming Meetings / Intelligence
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar")
-                        .foregroundColor(NativelyTheme.skyAccent)
-                        .font(.system(size: 12))
-                    Text("MEETING INTELLIGENCE")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(NativelyTheme.skyAccent)
-                }
-                
-                Text("Automatic local diarization, vector search & PDF export")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(NativelyTheme.textPrimary)
-                    .lineLimit(2)
-                
-                HStack(spacing: 8) {
-                    featureTag(label: "WhisperKit Neural", icon: "waveform")
-                    featureTag(label: "Local SQLite RAG", icon: "cylinder.split.1x2")
-                }
-                .padding(.top, 2)
+            // Card 2: Upcoming Calendar Meetings & Join Action
+            UpcomingCalendarCardView { event in
+                viewModel.startMeeting(title: event.title)
             }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.10), NativelyTheme.bgElevated],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.purple.opacity(0.20), lineWidth: 0.5)
-            )
         }
     }
     
