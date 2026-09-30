@@ -65,11 +65,12 @@ public actor TurnPlannerActor {
             conversationHistory = ModePromptBuilder.formatConversationHistory(turns: turns, maxTurns: 8)
         }
         
-        // 2. Fetch mode custom prompt if available
+        // 2. Fetch mode custom prompt if available (only apply custom prompt override if isCustom == true)
         let mode = try? database.fetchMode(id: modeId)
+        let customPrompt = (mode?.isCustom == true) ? mode?.prompt : nil
         let systemPrompt = ModePromptBuilder.buildSystemPrompt(
             modeId: modeId,
-            customPrompt: mode?.prompt,
+            customPrompt: customPrompt,
             screenContext: screenContext
         )
         

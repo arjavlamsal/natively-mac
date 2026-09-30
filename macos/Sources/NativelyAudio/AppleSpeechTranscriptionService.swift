@@ -1,6 +1,7 @@
 import Foundation
 import Speech
 import AVFoundation
+import os
 import NativelyCore
 
 /// Native Apple Speech transcription service using macOS Speech.framework (`SFSpeechRecognizer`).
@@ -49,41 +50,49 @@ public actor AppleSpeechTranscriptionService {
         request.append(pcmBuffer)
         request.endAudio()
         
+        let lock = OSAllocatedUnfairLock(initialState: false)
+        
         return try await withCheckedThrowingContinuation { continuation in
-            var hasResumed = false
-            
-            recognizer.recognitionTask(with: request) { result, error in
-                if error != nil {
+            let finish: @Sendable (Result<[WhisperSegment], Error>) -> Void = { result in
+                let shouldResume = lock.withLock { hasResumed -> Bool in
                     if !hasResumed {
                         hasResumed = true
-                        // SFSpeechRecognizer often returns errors on silence or empty buffers; return empty segments gracefully
-                        continuation.resume(returning: [])
+                        return true
                     }
+                    return false
+                }
+                if shouldResume {
+                    continuation.resume(with: result)
+                }
+            }
+            
+            let task = recognizer.recognitionTask(with: request) { result, error in
+                if error != nil {
+                    finish(.success([]))
                     return
                 }
                 
                 if let result = result, result.isFinal {
-                    if !hasResumed {
-                        hasResumed = true
-                        let transcription = result.bestTranscription
-                        let text = transcription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
-                        
-                        guard !text.isEmpty else {
-                            continuation.resume(returning: [])
-                            return
-                        }
-                        
-                        let durationMs = Int64(Double(audioSamples.count) / 16.0)
-                        let segment = WhisperSegment(
-                            text: text,
-                            startMs: 0,
-                            endMs: durationMs,
-                            confidence: 1.0
-                        )
-                        continuation.resume(returning: [segment])
+                    let transcription = result.bestTranscription
+                    let text = transcription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    guard !text.isEmpty else {
+                        finish(.success([]))
+                        return
                     }
+                    
+                    let durationMs = Int64(Double(audioSamples.count) / 16.0)
+                    let segment = WhisperSegment(
+                        text: text,
+                        startMs: 0,
+                        endMs: durationMs,
+                        confidence: 1.0
+                    )
+                    finish(.success([segment]))
                 }
             }
+            
+            _ = task
         }
     }
     
@@ -95,7 +104,7 @@ public actor AppleSpeechTranscriptionService {
         if let channelData = buffer.floatChannelData {
             samples.withUnsafeBufferPointer { ptr in
                 guard let base = ptr.baseAddress else { return }
-                channelData[0].initialize(from: base, count: samples.count)
+                channelData[0].update(from: base, count: samples.count)
             }
         }
         return buffer
