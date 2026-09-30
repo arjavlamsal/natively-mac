@@ -64,4 +64,26 @@ struct MeetingTests {
         #expect(settings.isAdaptiveDockEnabled == true)
         #expect(settings.selectedAIProvider == .anthropic)
     }
+
+    @Test("CalendarEvent model initialization and formatting")
+    func testCalendarEvent() {
+        let now = Date()
+        let event = CalendarEvent(
+            id: "cal-1",
+            title: "Q3 Engineering Sync",
+            startDate: now,
+            endDate: now.addingTimeInterval(3600),
+            attendees: ["Alex", "Jordan"],
+            location: "Zoom",
+            meetingURL: URL(string: "https://zoom.us/j/123456789"),
+            notes: "Discussion on Swift port"
+        )
+
+        #expect(event.id == "cal-1")
+        #expect(event.title == "Q3 Engineering Sync")
+        #expect(event.attendees.count == 2)
+        #expect(event.isOngoing == true)
+        #expect(event.meetingURL?.absoluteString == "https://zoom.us/j/123456789")
+        #expect(event.formattedTimeLabel == "Happening Now")
+    }
 }

@@ -26,6 +26,12 @@
     <string>Natively uses screen capture for instant code OCR and region analysis.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>Natively uses local network to pair with the Natively Chrome extension and companion devices.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Natively accesses your calendar to show upcoming meetings and allow 1-click meeting recording.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Natively accesses your calendar to show upcoming meetings and allow 1-click meeting recording.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Natively uses speech recognition for live on-device transcription.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>
