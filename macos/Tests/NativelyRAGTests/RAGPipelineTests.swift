@@ -117,4 +117,29 @@ struct RAGPipelineTests {
         #expect(savedChunks[0].text.contains("[sample_system_design.md]"))
         #expect(savedChunks[0].text.contains("System Architecture"))
     }
+
+    @Test("DocumentIngestionService handles empty files and alternative encodings gracefully")
+    func testDocumentIngestionEdgeCases() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let ingestion = DocumentIngestionService(database: db)
+
+        // 1. Empty file
+        let emptyURL = FileManager.default.temporaryDirectory.appendingPathComponent("empty_notes.txt")
+        try "".write(to: emptyURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: emptyURL) }
+
+        let emptyCount = try await ingestion.ingestDocument(at: emptyURL, meetingId: "m-empty")
+        #expect(emptyCount == 0)
+
+        // 2. ISO-Latin-1 encoding
+        let meetingId = "m-latin"
+        try db.saveMeeting(Meeting(id: meetingId, title: "Latin Notes Meeting"))
+        let latinURL = FileManager.default.temporaryDirectory.appendingPathComponent("latin_notes.txt")
+        let latinData = "Resume: François Müller with résumé and café experience.".data(using: .isoLatin1)!
+        try latinData.write(to: latinURL)
+        defer { try? FileManager.default.removeItem(at: latinURL) }
+
+        let latinCount = try await ingestion.ingestDocument(at: latinURL, meetingId: meetingId)
+        #expect(latinCount >= 1)
+    }
 }

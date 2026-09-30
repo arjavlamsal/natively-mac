@@ -173,9 +173,14 @@ public struct FollowUpDraftSheet: View {
     }
     
     private func openInMail() {
-        let subjectEncoded = draftSubject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let bodyEncoded = draftBody.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        if let mailtoURL = URL(string: "mailto:?subject=\(subjectEncoded)&body=\(bodyEncoded)") {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = ""
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: draftSubject),
+            URLQueryItem(name: "body", value: draftBody)
+        ]
+        if let mailtoURL = components.url {
             NSWorkspace.shared.open(mailtoURL)
         }
     }
