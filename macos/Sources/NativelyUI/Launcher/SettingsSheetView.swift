@@ -15,7 +15,7 @@ public struct SettingsSheetView: View {
     @State private var isTokenCopied = false
     
     // Audio Settings
-    @AppStorage("natively_stt_engine") private var sttEngine: String = "whisperkit"
+    @AppStorage("natively_stt_engine") private var sttEngine: String = "apple-speech"
     @AppStorage("natively_vad_threshold") private var vadThreshold: Double = 0.5
     @AppStorage("natively_selected_mic") private var selectedMicId: String = "default"
     
@@ -87,6 +87,7 @@ public struct SettingsSheetView: View {
             .background(NativelyTheme.bgPrimary)
         }
         .frame(width: 820, height: 580)
+        .enforceStealthMode()
         .onAppear {
             selectedTab = viewModel.settingsSelectedTab
             viewModel.loadModes()
@@ -536,8 +537,8 @@ public struct SettingsSheetView: View {
                     .foregroundColor(NativelyTheme.textTertiary)
                 
                 Picker("", selection: $sttEngine) {
-                    Text("WhisperKit (Apple Silicon On-Device Neural Engine)").tag("whisperkit")
-                    Text("Apple Speech (macOS Native SFSpeechRecognizer)").tag("apple_speech")
+                    Text("Apple Speech (macOS Native SFSpeechRecognizer - Fast & Zero-Download)").tag("apple-speech")
+                    Text("WhisperKit (Apple Silicon On-Device Neural Engine / GPU)").tag("whisperkit")
                     Text("Groq Whisper Cloud (Ultra-Fast Remote Transcription)").tag("groq_cloud")
                 }
                 .pickerStyle(.radioGroup)

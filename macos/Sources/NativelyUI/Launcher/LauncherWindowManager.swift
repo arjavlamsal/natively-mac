@@ -43,6 +43,7 @@ public final class LauncherWindowManager: ObservableObject {
         newWindow.backgroundColor = NSColor(red: 0.05, green: 0.05, blue: 0.07, alpha: 1.0)
         newWindow.minSize = NSSize(width: 820, height: 560)
         newWindow.isReleasedWhenClosed = false
+        newWindow.applyStealthPolicy()
         
         let hostingView = NSHostingView(rootView: LauncherDashboardView(viewModel: viewModel))
         newWindow.contentView = hostingView

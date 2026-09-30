@@ -61,3 +61,53 @@ public final class StealthPanel: NSPanel {
         }
     }
 }
+
+// MARK: - Universal Window Stealth Policy Extension
+
+extension NSWindow {
+    /// Applies hardware screen-share stealth (`sharingType = .none`) to this window.
+    /// Completely invisible to ScreenCaptureKit, Zoom, Microsoft Teams, Google Meet, and OBS.
+    @MainActor
+    public func applyStealthPolicy(_ enabled: Bool? = nil) {
+        let isStealth = enabled ?? (UserDefaults.standard.object(forKey: "natively_undetectable") as? Bool ?? true)
+        self.sharingType = isStealth ? .none : .readOnly
+    }
+}
+
+// MARK: - SwiftUI Stealth Enforcement View Modifier
+
+import SwiftUI
+
+/// SwiftUI ViewModifier that attaches an NSViewRepresentable hook to enforce stealth `sharingType = .none`
+/// on any hosting NSWindow or sheet.
+public struct EnforceStealthWindowModifier: ViewModifier {
+    public init() {}
+    
+    public func body(content: Content) -> some View {
+        content
+            .background(StealthWindowAccessor())
+    }
+}
+
+private struct StealthWindowAccessor: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            view.window?.applyStealthPolicy()
+        }
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            nsView.window?.applyStealthPolicy()
+        }
+    }
+}
+
+extension View {
+    /// Enforces hardware screen-share stealth (`sharingType = .none`) on the enclosing window.
+    public func enforceStealthMode() -> some View {
+        self.modifier(EnforceStealthWindowModifier())
+    }
+}
