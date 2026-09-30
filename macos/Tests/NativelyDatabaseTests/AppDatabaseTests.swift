@@ -127,4 +127,27 @@ struct AppDatabaseTests {
         try db.setAppState(key: "theme", value: nil)
         #expect(try db.getAppState(key: "theme") == nil)
     }
+
+    @Test("Default modes seeding and mode deletion")
+    func testDefaultModesSeedingAndDeletion() throws {
+        let db = try AppDatabase.makeInMemory()
+
+        // Seed 11 default modes
+        try db.seedDefaultModesIfEmpty()
+        let modes = try db.fetchModes()
+        #expect(modes.count == 11)
+
+        let active = try db.fetchActiveMode()
+        #expect(active != nil)
+        #expect(active?.id == "mode-tech-interview")
+
+        // Add custom mode and delete it
+        let customMode = Mode(id: "custom-negotiation", name: "Custom Negotiation", prompt: "Negotiate salary", isCustom: true, isActive: false)
+        try db.saveMode(customMode)
+        #expect(try db.fetchModes().count == 12)
+
+        try db.deleteMode(id: "custom-negotiation")
+        #expect(try db.fetchModes().count == 11)
+        #expect(try db.fetchMode(id: "custom-negotiation") == nil)
+    }
 }

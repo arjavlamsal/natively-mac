@@ -225,6 +225,43 @@ public final class AppDatabase: Sendable {
         }
     }
 
+    public func deleteMode(id: String) throws {
+        try dbWriter.write { db in
+            _ = try ModeRecord.filter(Column("id") == id).deleteAll(db)
+        }
+    }
+
+    public func seedDefaultModesIfEmpty() throws {
+        let existing = try fetchModes()
+        guard existing.isEmpty else { return }
+
+        let defaults: [(id: String, name: String, prompt: String, description: String, active: Bool)] = [
+            ("mode-tech-interview", "Technical Interview", "Provide concise, mathematically rigorous answers with BLUF and code complexity.", "Coding and system design copilot for technical interviews.", true),
+            ("mode-looking-for-work", "Job Interview", "Focus on STAR method with clear metrics, ownership, and impactful outcomes.", "Behavioral interviews and career background storytelling.", false),
+            ("mode-sales", "Sales & Pitching", "Enterprise sales discovery using MEDDPICC and proactive objection handling.", "Sales qualification, pipeline discovery, and closing.", false),
+            ("mode-recruiting", "Recruiting & Hiring", "Assess candidate competency, cultural alignment, and structured interview rubrics.", "Hiring manager and recruiter candidate evaluation.", false),
+            ("mode-team-meet", "Team Standup & Sync", "Synthesize sprint blockers, cross-functional dependencies, and deliverables.", "Agile standups, project syncs, and team planning.", false),
+            ("mode-lecture", "Lecture & Course", "Capture academic concepts, mathematical derivations, and structured study notes.", "University lectures, seminars, and technical tutorials.", false),
+            ("mode-seminar", "Seminar & Keynote", "Executive symposium synthesis, panel themes, and research critique.", "Conferences, industry keynotes, and expert panels.", false),
+            ("mode-call-center", "Customer Support", "Empathetic troubleshooting, de-escalation, and root-cause resolution.", "Customer support and client success calls.", false),
+            ("mode-negotiation", "Negotiation Coach", "Tactical empathy, calibrated questions, labeling, and counter-proposals.", "Salary, procurement, and commercial contract negotiations.", false),
+            ("mode-executive", "Executive Advisor", "High-altitude strategic synthesis with BLUF and trade-off matrices.", "Board meetings, strategy reviews, and C-level syncs.", false),
+            ("mode-general", "General Meeting", "Concise, actionable assistance for general conversations.", "Everyday meetings and discussions.", false)
+        ]
+
+        for item in defaults {
+            let mode = Mode(
+                id: item.id,
+                name: item.name,
+                prompt: item.prompt,
+                isCustom: false,
+                isActive: item.active,
+                description: item.description
+            )
+            try saveMode(mode)
+        }
+    }
+
     // MARK: - App State (KV Store)
 
     public func getAppState(key: String) throws -> String? {
