@@ -35,19 +35,55 @@ public actor TurnPlannerActor {
         }
     }
     
-    /// Resolves the API key for a provider from the macOS Keychain.
+    /// Resolves the API key for a provider from Keychain, UserDefaults, or environment variables.
     public func resolveAPIKey(for provider: AIProviderType) async -> String? {
         let keyName: String
+        let envName: String
         switch provider {
-        case .anthropic: keyName = "anthropic_api_key"
-        case .openAI: keyName = "openai_api_key"
-        case .googleGemini: keyName = "gemini_api_key"
-        case .groq: keyName = "groq_api_key"
-        case .deepSeek: keyName = "deepseek_api_key"
-        case .ollama: return nil
+        case .anthropic:
+            keyName = "anthropic_api_key"
+            envName = "ANTHROPIC_API_KEY"
+        case .openAI:
+            keyName = "openai_api_key"
+            envName = "OPENAI_API_KEY"
+        case .googleGemini:
+            keyName = "gemini_api_key"
+            envName = "GEMINI_API_KEY"
+        case .groq:
+            keyName = "groq_api_key"
+            envName = "GROQ_API_KEY"
+        case .deepSeek:
+            keyName = "deepseek_api_key"
+            envName = "DEEPSEEK_API_KEY"
+        case .ollama:
+            return nil
         }
         
-        return try? await keychain.get(key: keyName)
+        // 1. Try Keychain
+        if let key = try? await keychain.get(key: keyName) {
+            let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        
+        // 2. Try UserDefaults backup with prefix
+        if let key = UserDefaults.standard.string(forKey: "natively_\(keyName)") {
+            let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        
+        // 3. Try UserDefaults backup without prefix
+        if let key = UserDefaults.standard.string(forKey: keyName) {
+            let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        
+        // 4. Try Environment variables
+        if let key = ProcessInfo.processInfo.environment[envName] {
+            let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+        }
+        
+        return nil
     }
     
     /// Assembles context, resolves keys, runs the fallback streaming ladder, and saves the interaction to GRDB.

@@ -33,10 +33,10 @@ public actor FallbackLadderEngine {
     /// Default prioritized fallback ladder.
     public static var defaultLadder: [FallbackRung] {
         [
-            FallbackRung(providerType: .anthropic, model: "claude-3-5-sonnet-20241022", ttftTimeoutSeconds: 4.0),
+            FallbackRung(providerType: .googleGemini, model: "gemini-3.8-flash", ttftTimeoutSeconds: 3.5),
+            FallbackRung(providerType: .anthropic, model: "claude-3-7-sonnet", ttftTimeoutSeconds: 4.0),
             FallbackRung(providerType: .openAI, model: "gpt-4o", ttftTimeoutSeconds: 4.0),
             FallbackRung(providerType: .groq, model: "llama-3.3-70b-versatile", ttftTimeoutSeconds: 3.0),
-            FallbackRung(providerType: .googleGemini, model: "gemini-1.5-flash", ttftTimeoutSeconds: 3.5),
             FallbackRung(providerType: .deepSeek, model: "deepseek-chat", ttftTimeoutSeconds: 4.0),
             FallbackRung(providerType: .ollama, model: "llama3.2", ttftTimeoutSeconds: 5.0)
         ]

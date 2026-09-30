@@ -13,13 +13,18 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
     public func stream(request: AIRequest, apiKey: String?) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                guard let key = apiKey, !key.isEmpty else {
+                guard let rawKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines), !rawKey.isEmpty else {
                     continuation.finish(throwing: AIClientError.missingAPIKey("Gemini"))
                     return
                 }
                 
-                let encodedModel = request.model.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? request.model
-                let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(encodedModel):streamGenerateContent?alt=sse&key=\(key)"
+                // Normalize model name (strip "models/" prefix if already present to prevent duplicate paths)
+                let rawModel = request.model.hasPrefix("models/") ? String(request.model.dropFirst(7)) : request.model
+                let cleanModel = rawModel.trimmingCharacters(in: .whitespacesAndNewlines)
+                let targetModel = cleanModel.isEmpty ? "gemini-3.8-flash" : cleanModel
+                
+                let encodedModel = targetModel.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? targetModel
+                let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(encodedModel):streamGenerateContent?alt=sse&key=\(rawKey)"
                 
                 guard let url = URL(string: urlString) else {
                     continuation.finish(throwing: AIClientError.invalidURL(urlString))
@@ -29,6 +34,7 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
                 var urlRequest = URLRequest(url: url)
                 urlRequest.httpMethod = "POST"
                 urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                urlRequest.setValue(rawKey, forHTTPHeaderField: "x-goog-api-key")
                 
                 var contents: [[String: Any]] = []
                 for msg in request.messages {
@@ -39,22 +45,30 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
                         for img in images {
                             let cleanBase64 = img.components(separatedBy: "base64,").last ?? img
                             parts.append([
-                                "inline_data": [
-                                    "mime_type": "image/png",
+                                "inlineData": [
+                                    "mimeType": "image/png",
                                     "data": cleanBase64
                                 ]
                             ])
                         }
                     }
-                    parts.append(["text": msg.content])
-                    contents.append(["role": role, "parts": parts])
+                    if !msg.content.isEmpty {
+                        parts.append(["text": msg.content])
+                    }
+                    if !parts.isEmpty {
+                        contents.append(["role": role, "parts": parts])
+                    }
+                }
+                
+                if contents.isEmpty {
+                    contents.append(["role": "user", "parts": [["text": "Hello"]]])
                 }
                 
                 var payload: [String: Any] = [
                     "contents": contents
                 ]
                 
-                if let system = request.systemPrompt, !system.isEmpty {
+                if let system = request.systemPrompt, !system.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     payload["system_instruction"] = [
                         "parts": [["text": system]]
                     ]
@@ -85,16 +99,26 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
                     }
                     
                     var parser = SSEParser()
+                    var hasEmittedAnyChunk = false
+                    
                     for try await line in asyncBytes.lines {
                         if let event = parser.feed(line: line) {
-                            handleEvent(event, continuation: continuation)
+                            if handleEvent(event, continuation: continuation) {
+                                hasEmittedAnyChunk = true
+                            }
                         }
                     }
                     if let trailing = parser.finish() {
-                        handleEvent(trailing, continuation: continuation)
+                        if handleEvent(trailing, continuation: continuation) {
+                            hasEmittedAnyChunk = true
+                        }
                     }
                     
-                    continuation.finish()
+                    if !hasEmittedAnyChunk {
+                        continuation.finish(throwing: AIClientError.emptyResponse)
+                    } else {
+                        continuation.finish()
+                    }
                 } catch {
                     continuation.finish(throwing: error)
                 }
@@ -102,20 +126,41 @@ public final class GeminiStreamingClient: StreamingAIProvider, Sendable {
         }
     }
     
-    private func handleEvent(_ event: SSEEvent, continuation: AsyncThrowingStream<String, Error>.Continuation) {
+    @discardableResult
+    private func handleEvent(_ event: SSEEvent, continuation: AsyncThrowingStream<String, Error>.Continuation) -> Bool {
         guard let eventData = event.data.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: eventData) as? [String: Any],
-              let candidates = json["candidates"] as? [[String: Any]],
-              let firstCandidate = candidates.first,
-              let contentObj = firstCandidate["content"] as? [String: Any],
-              let parts = contentObj["parts"] as? [[String: Any]] else {
-            return
+              let rawJson = try? JSONSerialization.jsonObject(with: eventData) else {
+            return false
         }
         
-        for part in parts {
-            if let text = part["text"] as? String {
-                continuation.yield(text)
+        let candidateObjects: [[String: Any]]
+        if let dict = rawJson as? [String: Any] {
+            if let errorObj = dict["error"] as? [String: Any] {
+                let msg = errorObj["message"] as? String ?? "Google Gemini API error"
+                let code = errorObj["code"] as? Int ?? 400
+                continuation.finish(throwing: AIClientError.httpError(statusCode: code, body: msg))
+                return false
+            }
+            candidateObjects = dict["candidates"] as? [[String: Any]] ?? []
+        } else if let array = rawJson as? [[String: Any]] {
+            candidateObjects = array.first?["candidates"] as? [[String: Any]] ?? []
+        } else {
+            return false
+        }
+        
+        var emitted = false
+        for candidate in candidateObjects {
+            guard let contentObj = candidate["content"] as? [String: Any],
+                  let parts = contentObj["parts"] as? [[String: Any]] else {
+                continue
+            }
+            for part in parts {
+                if let text = part["text"] as? String, !text.isEmpty {
+                    continuation.yield(text)
+                    emitted = true
+                }
             }
         }
+        return emitted
     }
 }

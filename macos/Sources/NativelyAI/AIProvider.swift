@@ -17,9 +17,9 @@ extension AIProviderType {
     
     public var defaultModel: String {
         switch self {
-        case .anthropic: return "claude-3-5-sonnet-20241022"
+        case .anthropic: return "claude-3-7-sonnet"
         case .openAI: return "gpt-4o"
-        case .googleGemini: return "gemini-1.5-flash"
+        case .googleGemini: return "gemini-3.8-flash"
         case .groq: return "llama-3.3-70b-versatile"
         case .deepSeek: return "deepseek-chat"
         case .ollama: return "llama3.2"
