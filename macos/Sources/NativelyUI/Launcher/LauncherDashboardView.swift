@@ -379,6 +379,9 @@ public struct LauncherDashboardView: View {
             
             // Card 2: Upcoming Calendar Meetings & Join Action
             UpcomingCalendarCardView { event in
+                if let url = event.meetingURL {
+                    NSWorkspace.shared.open(url)
+                }
                 viewModel.startMeeting(title: event.title)
             }
         }

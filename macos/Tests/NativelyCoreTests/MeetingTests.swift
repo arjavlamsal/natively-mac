@@ -86,4 +86,17 @@ struct MeetingTests {
         #expect(event.meetingURL?.absoluteString == "https://zoom.us/j/123456789")
         #expect(event.formattedTimeLabel == "Happening Now")
     }
+
+    @Test("CalendarEvent future date formatting")
+    func testCalendarEventFuture() {
+        let tomorrow = Date().addingTimeInterval(86400)
+        let event = CalendarEvent(
+            id: "cal-2",
+            title: "Future Planning",
+            startDate: tomorrow,
+            endDate: tomorrow.addingTimeInterval(3600)
+        )
+        #expect(event.isOngoing == false)
+        #expect(event.formattedTimeLabel.contains("Tomorrow at") || event.formattedTimeLabel.contains("at"))
+    }
 }

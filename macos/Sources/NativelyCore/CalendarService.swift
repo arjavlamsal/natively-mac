@@ -85,6 +85,8 @@ public final class CalendarService: @unchecked Sendable {
         }
     }
     
+    private static let linkDetector: NSDataDetector? = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    
     /// Discovers video meeting links (Zoom, Google Meet, Microsoft Teams, Webex) from an EKEvent.
     private func extractMeetingURL(from event: EKEvent) -> URL? {
         // 1. Direct URL property
@@ -92,14 +94,20 @@ public final class CalendarService: @unchecked Sendable {
             return url
         }
         
-        // 2. Scan location string
-        if let location = event.location, let url = extractURL(from: location), isVideoConferenceURL(url) {
-            return url
+        // 2. Scan location string for any video conference URLs
+        if let location = event.location {
+            let urls = extractURLs(from: location)
+            if let videoURL = urls.first(where: { isVideoConferenceURL($0) }) {
+                return videoURL
+            }
         }
         
-        // 3. Scan notes / description
-        if let notes = event.notes, let url = extractURL(from: notes), isVideoConferenceURL(url) {
-            return url
+        // 3. Scan notes / description for any video conference URLs
+        if let notes = event.notes {
+            let urls = extractURLs(from: notes)
+            if let videoURL = urls.first(where: { isVideoConferenceURL($0) }) {
+                return videoURL
+            }
         }
         
         return event.url
@@ -110,14 +118,15 @@ public final class CalendarService: @unchecked Sendable {
         return str.contains("zoom.us/") ||
                str.contains("meet.google.com/") ||
                str.contains("teams.microsoft.com/") ||
+               str.contains("teams.live.com/") ||
                str.contains("webex.com/") ||
                str.contains("chime.aws/") ||
                str.contains("around.co/")
     }
     
-    private func extractURL(from text: String) -> URL? {
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-        let matches = detector?.matches(in: text, options: [], range: NSRange(location: 0, length: (text as NSString).length))
-        return matches?.first?.url
+    private func extractURLs(from text: String) -> [URL] {
+        guard let detector = Self.linkDetector else { return [] }
+        let matches = detector.matches(in: text, options: [], range: NSRange(location: 0, length: (text as NSString).length))
+        return matches.compactMap { $0.url }
     }
 }

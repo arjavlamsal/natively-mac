@@ -37,6 +37,18 @@ public struct CalendarEvent: Identifiable, Codable, Sendable, Equatable {
         return startDate <= now && now <= endDate
     }
     
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d"
+        return formatter
+    }()
+    
     /// Formatted time label (e.g. "Today at 2:00 PM", "Tomorrow at 10:00 AM", or "In progress").
     public var formattedTimeLabel: String {
         if isOngoing {
@@ -44,9 +56,7 @@ public struct CalendarEvent: Identifiable, Codable, Sendable, Equatable {
         }
         
         let calendar = Calendar.current
-        let timeFormatter = DateFormatter()
-        timeFormatter.timeStyle = .short
-        let timeString = timeFormatter.string(from: startDate)
+        let timeString = Self.timeFormatter.string(from: startDate)
         
         if calendar.isDateInToday(startDate) {
             let diffMinutes = Int(startDate.timeIntervalSinceNow / 60)
@@ -57,9 +67,7 @@ public struct CalendarEvent: Identifiable, Codable, Sendable, Equatable {
         } else if calendar.isDateInTomorrow(startDate) {
             return "Tomorrow at \(timeString)"
         } else {
-            let dayFormatter = DateFormatter()
-            dayFormatter.dateFormat = "EEE, MMM d"
-            return "\(dayFormatter.string(from: startDate)) at \(timeString)"
+            return "\(Self.dayFormatter.string(from: startDate)) at \(timeString)"
         }
     }
 }
