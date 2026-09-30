@@ -133,7 +133,7 @@ public struct TopPillBarView: View {
             
             // 5. RED END MEETING / STOP BUTTON
             Button(action: {
-                viewModel.onEndMeeting?()
+                viewModel.stopMeeting()
             }) {
                 HStack(spacing: 5) {
                     RoundedRectangle(cornerRadius: 2.5, style: .continuous)

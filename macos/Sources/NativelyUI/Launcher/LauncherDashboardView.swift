@@ -44,6 +44,7 @@ public struct LauncherDashboardView: View {
             }
         }
         .frame(minWidth: 880, minHeight: 620)
+        .enforceStealthMode()
         .sheet(isPresented: $viewModel.isSettingsPresented) {
             SettingsSheetView(viewModel: viewModel)
         }
@@ -53,7 +54,7 @@ public struct LauncherDashboardView: View {
             }
         }
         .onChange(of: isUndetectable) { _, newValue in
-            OverlayWindowManager.shared.setStealthMode(newValue)
+            AppCoordinator.shared.setStealthMode(newValue)
         }
     }
     
@@ -286,7 +287,7 @@ public struct LauncherDashboardView: View {
                                 .frame(width: 8, height: 8)
                         }
                         
-                        Text("Meeting ongoing")
+                        Text("Stop Meeting")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.white)
                     } else {
@@ -302,7 +303,9 @@ public struct LauncherDashboardView: View {
                 .padding(.horizontal, 22)
                 .padding(.vertical, 12)
                 .background(
-                    viewModel.isMeetingActive ? NativelyTheme.ctaActiveGradient : NativelyTheme.ctaIdleGradient
+                    viewModel.isMeetingActive ?
+                        LinearGradient(colors: [NativelyTheme.dangerRed, Color(red: 0.8, green: 0.15, blue: 0.2)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                        NativelyTheme.ctaIdleGradient
                 )
                 .clipShape(Capsule())
                 .overlay(

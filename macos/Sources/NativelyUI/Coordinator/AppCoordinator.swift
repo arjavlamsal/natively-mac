@@ -100,7 +100,10 @@ public final class AppCoordinator: ObservableObject {
         // 6. Check System Permissions
         permissionsManager.checkAllPermissions()
         
-        // 7. Setup Audio Turn Handler
+        // 7. Universal Stealth Enforcement across all app windows
+        setupUniversalStealthObservers()
+        
+        // 8. Setup Audio Turn Handler
         Task { [weak self] in
             guard let self else { return }
             await self.audioCoordinator.setTurnHandler { [weak self] turn in
@@ -115,6 +118,10 @@ public final class AppCoordinator: ObservableObject {
     public func shutdown() {
         companionServer.stop()
         hotkeyManager.unregisterAll()
+        for observer in stealthObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        stealthObservers.removeAll()
         overlayWindowManager.hideOverlay()
         launcherWindowManager.hideLauncher()
         Task { [weak self] in
@@ -245,77 +252,146 @@ public final class AppCoordinator: ObservableObject {
         // 2. Sync Companion Server
         companionServer.isMeetingActive = true
         
-        // 3. Enforce Hardware Stealth Mode (sharingType = .none)
+        // 3. Enforce Universal Hardware Stealth Mode (sharingType = .none)
         UserDefaults.standard.set(true, forKey: "natively_undetectable")
-        overlayWindowManager.setStealthMode(true)
+        enforceStealthModeOnAllWindows(true)
         
         // 4. Automatically Show & Expand Stealth Overlay
         overlayWindowManager.viewModel.currentMeetingId = meetingId
+        overlayWindowManager.viewModel.isMeetingActive = true
         overlayWindowManager.viewModel.isExpanded = true
         overlayWindowManager.showOverlay()
         
         // 5. Update System Menu Bar
         menuBarController.setMeetingState(isActive: true, title: displayTitle)
         
-        // 6. Start Native Dual-Channel Audio Capture
+        // 6. Start Native Dual-Channel Audio Capture with user-selected STT engine
+        let enginePref = UserDefaults.standard.string(forKey: "natively_stt_engine") ?? "apple-speech"
+        let engine: STTEngineType = (enginePref == "whisperkit") ? .whisperKit : .appleSpeech
         Task { [weak self] in
+            await self?.audioCoordinator.setSTTEngine(engine)
             try? await self?.audioCoordinator.startMeeting(id: meetingId)
         }
     }
     
+    @discardableResult
     public func stopMeetingSession() async -> Meeting? {
-        guard isMeetingActive, var meeting = activeMeeting else { return nil }
+        let currentActive = activeMeeting
+        let currentMeetingId = overlayWindowManager.viewModel.currentMeetingId ?? currentActive?.id
+        let startTime = self.meetingStartTime
         
-        // 1. Immediately update reactive UI state and persist completed status on MainActor
+        // 1. Immediately update reactive UI state and hide overlay on MainActor
         self.isMeetingActive = false
         self.activeMeeting = nil
-        let startTime = self.meetingStartTime
         self.meetingStartTime = nil
         
-        let durationMs: Int64
-        if let startTime {
-            durationMs = Int64(Date().timeIntervalSince(startTime) * 1000)
-        } else {
-            durationMs = 0
-        }
-        meeting.durationMs = durationMs
-        meeting.summaryStatus = "completed"
-        try? database.saveMeeting(meeting)
+        overlayWindowManager.hideOverlay()
+        overlayWindowManager.viewModel.isMeetingActive = false
+        overlayWindowManager.viewModel.currentMeetingId = nil
+        overlayWindowManager.viewModel.isExpanded = false
         
         launcherWindowManager.viewModel.isMeetingActive = false
         launcherWindowManager.viewModel.activeMeetingId = nil
-        launcherWindowManager.viewModel.loadMeetings()
-        launcherWindowManager.viewModel.selectMeeting(meeting)
         
-        overlayWindowManager.viewModel.currentMeetingId = nil
-        withAnimation(NativelyTheme.smoothSpring) {
-            overlayWindowManager.viewModel.isExpanded = false
-        }
         companionServer.isMeetingActive = false
         menuBarController.setMeetingState(isActive: false)
         
-        // 2. Stop Audio Recording in background
-        await audioCoordinator.stopMeeting()
-        
-        // 8. Auto-index meeting transcripts into semantic vector chunks for RAG
-        let turns = (try? database.fetchTranscripts(for: meeting.id)) ?? []
-        if !turns.isEmpty {
-            let chunks = SemanticChunker.chunkTranscripts(turns)
-            var vectorChunks: [VectorChunk] = []
-            for (idx, chunk) in chunks.enumerated() {
-                vectorChunks.append(VectorChunk(
-                    id: "\(meeting.id)-c\(idx)",
-                    meetingId: meeting.id,
-                    chunkIndex: idx,
-                    text: chunk.text,
-                    embedding: nil,
-                    timestampMs: Int64(idx * 2000)
-                ))
-            }
-            try? database.saveVectorChunks(vectorChunks)
+        // 2. Persist meeting duration and completed status
+        var meetingToSave: Meeting? = currentActive
+        if meetingToSave == nil, let mid = currentMeetingId {
+            meetingToSave = try? database.fetchMeeting(id: mid)
         }
         
-        return meeting
+        if var meeting = meetingToSave {
+            let durationMs: Int64
+            if let startTime {
+                durationMs = max(0, Int64(Date().timeIntervalSince(startTime) * 1000))
+            } else if let s = meeting.startTime {
+                durationMs = max(0, Int64(Date().timeIntervalSince1970 * 1000) - s)
+            } else {
+                durationMs = 0
+            }
+            meeting.durationMs = durationMs
+            meeting.summaryStatus = "completed"
+            try? database.saveMeeting(meeting)
+            meetingToSave = meeting
+        }
+        
+        launcherWindowManager.viewModel.loadMeetings()
+        if let meetingToSave {
+            launcherWindowManager.viewModel.selectMeeting(meetingToSave)
+        }
+        
+        // 3. Stop Audio Recording asynchronously (detached task avoids blocking UI)
+        Task.detached { [audioCoordinator] in
+            await audioCoordinator.stopMeeting()
+        }
+        
+        // 4. Auto-index meeting transcripts into semantic vector chunks for RAG
+        if let meetingToSave {
+            let turns = (try? database.fetchTranscripts(for: meetingToSave.id)) ?? []
+            if !turns.isEmpty {
+                let chunks = SemanticChunker.chunkTranscripts(turns)
+                var vectorChunks: [VectorChunk] = []
+                for (idx, chunk) in chunks.enumerated() {
+                    vectorChunks.append(VectorChunk(
+                        id: "\(meetingToSave.id)-c\(idx)",
+                        meetingId: meetingToSave.id,
+                        chunkIndex: idx,
+                        text: chunk.text,
+                        embedding: nil,
+                        timestampMs: Int64(idx * 2000)
+                    ))
+                }
+                try? database.saveVectorChunks(vectorChunks)
+            }
+        }
+        
+        return meetingToSave
+    }
+    
+    // MARK: - Universal Window Stealth Enforcement
+    
+    private var stealthObservers: [NSObjectProtocol] = []
+    
+    public func setupUniversalStealthObservers() {
+        enforceStealthModeOnAllWindows()
+        
+        let keySub = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.enforceStealthModeOnAllWindows()
+            }
+        }
+        
+        let mainSub = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeMainNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.enforceStealthModeOnAllWindows()
+            }
+        }
+        
+        stealthObservers = [keySub, mainSub]
+    }
+    
+    public func setStealthMode(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "natively_undetectable")
+        overlayWindowManager.setStealthMode(enabled)
+        enforceStealthModeOnAllWindows(enabled)
+    }
+    
+    public func enforceStealthModeOnAllWindows(_ enabled: Bool? = nil) {
+        let isStealth = enabled ?? (UserDefaults.standard.object(forKey: "natively_undetectable") as? Bool ?? true)
+        let sharingType: NSWindow.SharingType = isStealth ? .none : .readOnly
+        for window in NSApplication.shared.windows {
+            window.sharingType = sharingType
+        }
     }
     
     // MARK: - Mode Management

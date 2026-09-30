@@ -49,6 +49,7 @@ public final class OverlayViewModel: ObservableObject {
     @Published public var isModelSelectorPresented: Bool = false
     @Published public var showJumpToLatest: Bool = false
     @Published public var isDirectAssist: Bool = false
+    @Published public var isMeetingActive: Bool = false
     
     // Audio Activity
     @Published public var isAudioActive: Bool = false
@@ -204,6 +205,17 @@ public final class OverlayViewModel: ObservableObject {
         if !isManualRecording {
             // When stopped, trigger what to say
             triggerQuickAction(presetNumber: 1)
+        }
+    }
+    
+    /// Stops the active meeting session and updates local state.
+    public func stopMeeting() {
+        if let onEndMeeting {
+            onEndMeeting()
+        } else {
+            isMeetingActive = false
+            currentMeetingId = nil
+            isExpanded = false
         }
     }
     

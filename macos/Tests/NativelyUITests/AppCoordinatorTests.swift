@@ -227,4 +227,60 @@ struct AppCoordinatorTests {
         let chunksRemaining = try db.fetchVectorChunks(meetingId: "stress-m-1")
         #expect(chunksRemaining.isEmpty)
     }
+    
+    @Test("Universal stealth mode applies sharingType = .none to all app windows including Launcher")
+    @MainActor
+    func testUniversalStealthModeAcrossAllWindows() throws {
+        let db = try AppDatabase.makeInMemory()
+        let coordinator = AppCoordinator(database: db, companionPort: 4196)
+        coordinator.start()
+        
+        // Show launcher window
+        coordinator.launcherWindowManager.showLauncher()
+        guard let launcherWindow = coordinator.launcherWindowManager.window else {
+            Issue.record("Expected launcher window to be initialized")
+            return
+        }
+        
+        #expect(launcherWindow.sharingType == NSWindow.SharingType.none)
+        
+        // Enable stealth mode explicitly
+        coordinator.setStealthMode(true)
+        #expect(launcherWindow.sharingType == NSWindow.SharingType.none)
+        
+        // Create an arbitrary test window and verify applyStealthPolicy
+        let testWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 200),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        testWindow.applyStealthPolicy()
+        #expect(testWindow.sharingType == NSWindow.SharingType.none)
+        
+        coordinator.shutdown()
+    }
+    
+    @Test("OverlayViewModel stopMeeting cleanly resets state and dismisses session")
+    @MainActor
+    func testOverlayStopMeetingResetsState() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let coordinator = AppCoordinator(database: db, companionPort: 4197)
+        coordinator.start()
+        
+        coordinator.startMeetingSession(title: "Direct Stop Test")
+        #expect(coordinator.isMeetingActive == true)
+        #expect(coordinator.overlayWindowManager.viewModel.isMeetingActive == true)
+        
+        // Directly trigger stopMeeting on the OverlayViewModel as done by TopPillBarView
+        coordinator.overlayWindowManager.viewModel.stopMeeting()
+        
+        try? await Task.sleep(nanoseconds: 150_000_000)
+        
+        #expect(coordinator.isMeetingActive == false)
+        #expect(coordinator.overlayWindowManager.viewModel.isMeetingActive == false)
+        #expect(coordinator.overlayWindowManager.viewModel.currentMeetingId == nil)
+        
+        coordinator.shutdown()
+    }
 }
