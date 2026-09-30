@@ -11,12 +11,23 @@ public struct AIModelInfo: Identifiable, Hashable, Sendable {
     public let id: String
     public let name: String
     public let provider: String
+    public let providerType: AIProviderType
+    public let subtitle: String
     public let isFast: Bool
     
-    public init(id: String, name: String, provider: String, isFast: Bool = false) {
+    public init(
+        id: String,
+        name: String,
+        provider: String,
+        providerType: AIProviderType,
+        subtitle: String = "",
+        isFast: Bool = false
+    ) {
         self.id = id
         self.name = name
         self.provider = provider
+        self.providerType = providerType
+        self.subtitle = subtitle
         self.isFast = isFast
     }
 }
@@ -69,19 +80,38 @@ public final class OverlayViewModel: ObservableObject {
     @Published public var messages: [OverlayMessage] = []
     @Published public var isAIStreaming: Bool = false
     @Published public var currentAIText: String = ""
-    @Published public var currentProviderName: String = "Claude 3.5 Sonnet"
+    @Published public var currentProviderName: String = "Gemini 3.8 Flash"
     @Published public var ttftLatencyMs: Double? = nil
     
     public static let defaultModels: [AIModelInfo] = [
-        AIModelInfo(id: "claude-3-5-sonnet", name: "Sonnet 3.5", provider: "Anthropic"),
-        AIModelInfo(id: "gpt-4o", name: "GPT-4o", provider: "OpenAI"),
-        AIModelInfo(id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", provider: "Google", isFast: true),
-        AIModelInfo(id: "groq-llama-3.3-70b", name: "Llama 3.3 (Groq)", provider: "Groq", isFast: true),
-        AIModelInfo(id: "deepseek-chat", name: "DeepSeek V3", provider: "DeepSeek")
+        // Google Gemini
+        AIModelInfo(id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", provider: "Google", providerType: .googleGemini, subtitle: "Ultra-fast multimodal reasoning", isFast: true),
+        AIModelInfo(id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", provider: "Google", providerType: .googleGemini, subtitle: "Lightweight, lowest latency", isFast: true),
+        AIModelInfo(id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", provider: "Google", providerType: .googleGemini, subtitle: "Frontier reasoning & complex logic"),
+        
+        // Anthropic Claude
+        AIModelInfo(id: "claude-3-7-sonnet", name: "Claude 3.7 Sonnet", provider: "Anthropic", providerType: .anthropic, subtitle: "Hybrid reasoning & coding depth"),
+        AIModelInfo(id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "Anthropic", providerType: .anthropic, subtitle: "Balanced speed & nuanced analysis"),
+        AIModelInfo(id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", provider: "Anthropic", providerType: .anthropic, subtitle: "Rapid responses & concise answers", isFast: true),
+        
+        // OpenAI
+        AIModelInfo(id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", providerType: .openAI, subtitle: "Versatile omni flagship"),
+        AIModelInfo(id: "o3-mini", name: "o3-mini", provider: "OpenAI", providerType: .openAI, subtitle: "High-reasoning STEM & coding", isFast: true),
+        
+        // Groq Cloud
+        AIModelInfo(id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", provider: "Groq", providerType: .groq, subtitle: "LPU-accelerated ultra-low TTFT", isFast: true),
+        
+        // DeepSeek
+        AIModelInfo(id: "deepseek-chat", name: "DeepSeek V3", provider: "DeepSeek", providerType: .deepSeek, subtitle: "High performance open reasoning"),
+        AIModelInfo(id: "deepseek-reasoner", name: "DeepSeek R1", provider: "DeepSeek", providerType: .deepSeek, subtitle: "Deep chain-of-thought problem solving")
     ]
     
     // Active Model
-    @Published public var currentModel: AIModelInfo = defaultModels[0]
+    @Published public var currentModel: AIModelInfo = defaultModels[0] {
+        didSet {
+            UserDefaults.standard.set(currentModel.id, forKey: "natively_selected_model_id")
+        }
+    }
     @Published public var availableModels: [AIModelInfo] = defaultModels
     
     // Vision / Screen Context
@@ -115,6 +145,13 @@ public final class OverlayViewModel: ObservableObject {
         self.activeMode = defaultMode
         self.availableModes = [defaultMode]
         
+        // Restore saved model selection if available
+        if let savedModelId = UserDefaults.standard.string(forKey: "natively_selected_model_id"),
+           let match = Self.defaultModels.first(where: { $0.id == savedModelId }) {
+            self.currentModel = match
+            self.currentProviderName = "\(match.name)"
+        }
+        
         loadInitialState()
     }
     
@@ -136,6 +173,12 @@ public final class OverlayViewModel: ObservableObject {
             }
         } catch {
             // Use defaults
+        }
+        
+        if let savedModelId = UserDefaults.standard.string(forKey: "natively_selected_model_id"),
+           let match = availableModels.first(where: { $0.id == savedModelId }) {
+            self.currentModel = match
+            self.currentProviderName = match.name
         }
     }
     
@@ -270,11 +313,27 @@ public final class OverlayViewModel: ObservableObject {
                         fullPrompt = prompt
                     }
                     
+                    // Build dynamic fallback ladder with user's selected model as primary rung
+                    let chosen = self?.currentModel ?? Self.defaultModels[0]
+                    var dynamicLadder: [FallbackRung] = [
+                        FallbackRung(
+                            providerType: chosen.providerType,
+                            model: chosen.id,
+                            ttftTimeoutSeconds: 4.5
+                        )
+                    ]
+                    for rung in FallbackLadderEngine.defaultLadder {
+                        if rung.providerType != chosen.providerType {
+                            dynamicLadder.append(rung)
+                        }
+                    }
+                    
                     let result = try await planner.generateAnswer(
                         question: fullPrompt,
                         meetingId: meetingId,
                         modeId: mode.id,
-                        screenContext: nil
+                        screenContext: nil,
+                        customLadder: dynamicLadder
                     )
                     
                     await MainActor.run {
@@ -298,7 +357,26 @@ public final class OverlayViewModel: ObservableObject {
                     }
                 } catch {
                     await MainActor.run {
-                        let errText = "\n\n*(Error: \(error.localizedDescription))*"
+                        let errDescription: String
+                        if let aiErr = error as? AIClientError {
+                            switch aiErr {
+                            case .missingAPIKey(let provider):
+                                errDescription = "No API key configured for \(provider). Please set your API key in Settings (Cmd+,) or check your environment variables."
+                            case .httpError(let statusCode, let body):
+                                errDescription = "Provider returned HTTP \(statusCode): \(body)"
+                            case .invalidURL(let url):
+                                errDescription = "Invalid request URL: \(url)"
+                            case .timeout(let msg):
+                                errDescription = "Request timed out: \(msg)"
+                            case .emptyResponse:
+                                errDescription = "The model returned an empty response. Please verify that your API key is valid and has access to this model."
+                            case .decodingError(let msg):
+                                errDescription = "Failed to parse provider response: \(msg)"
+                            }
+                        } else {
+                            errDescription = error.localizedDescription
+                        }
+                        let errText = "\n\n⚠️ **Error:** \(errDescription)"
                         self?.currentAIText.append(errText)
                         self?.appendAssistantChunk(id: assistantMsgId, chunk: errText)
                     }

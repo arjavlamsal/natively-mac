@@ -32,7 +32,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public init(
         selectedSTTEngine: STTEngineType = .appleSpeech,
         selectedAIProvider: AIProviderType = .anthropic,
-        selectedModel: String = "claude-3-5-sonnet-20241022",
+        selectedModel: String = "claude-3-7-sonnet",
         activeModeId: String = "tech-interview",
         isStealthModeEnabled: Bool = true,
         isAdaptiveDockEnabled: Bool = true,

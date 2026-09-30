@@ -210,34 +210,52 @@ public final class LauncherViewModel: ObservableObject {
         loadMeetings()
     }
     
-    /// Loads Keychain API keys.
+    /// Loads Keychain API keys with UserDefaults fallback.
     public func loadKeychainKeys() {
         Task { [weak self] in
             let kc = KeychainManager.shared
-            let anthropic = (try? await kc.get(key: "anthropic_api_key")) ?? ""
-            let openai = (try? await kc.get(key: "openai_api_key")) ?? ""
-            let gemini = (try? await kc.get(key: "gemini_api_key")) ?? ""
-            let groq = (try? await kc.get(key: "groq_api_key")) ?? ""
-            let deepseek = (try? await kc.get(key: "deepseek_api_key")) ?? ""
+            let anthropic = (try? await kc.get(key: "anthropic_api_key")) 
+                ?? UserDefaults.standard.string(forKey: "natively_anthropic_api_key") 
+                ?? ""
+            let openai = (try? await kc.get(key: "openai_api_key")) 
+                ?? UserDefaults.standard.string(forKey: "natively_openai_api_key") 
+                ?? ""
+            let gemini = (try? await kc.get(key: "gemini_api_key")) 
+                ?? UserDefaults.standard.string(forKey: "natively_gemini_api_key") 
+                ?? ""
+            let groq = (try? await kc.get(key: "groq_api_key")) 
+                ?? UserDefaults.standard.string(forKey: "natively_groq_api_key") 
+                ?? ""
+            let deepseek = (try? await kc.get(key: "deepseek_api_key")) 
+                ?? UserDefaults.standard.string(forKey: "natively_deepseek_api_key") 
+                ?? ""
             
             await MainActor.run {
-                self?.anthropicKey = anthropic
-                self?.openAIKey = openai
-                self?.geminiKey = gemini
-                self?.groqKey = groq
-                self?.deepSeekKey = deepseek
+                self?.anthropicKey = anthropic.trimmingCharacters(in: .whitespacesAndNewlines)
+                self?.openAIKey = openai.trimmingCharacters(in: .whitespacesAndNewlines)
+                self?.geminiKey = gemini.trimmingCharacters(in: .whitespacesAndNewlines)
+                self?.groqKey = groq.trimmingCharacters(in: .whitespacesAndNewlines)
+                self?.deepSeekKey = deepseek.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
     }
     
-    /// Saves updated Keychain API keys.
+    /// Saves updated Keychain API keys and mirrors to UserDefaults.
     public func saveKeychainKey(name: String, value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "natively_\(name)")
+            UserDefaults.standard.removeObject(forKey: name)
+        } else {
+            UserDefaults.standard.set(trimmed, forKey: "natively_\(name)")
+        }
+        
         Task {
             let kc = KeychainManager.shared
-            if value.trimmingCharacters(in: .whitespaces).isEmpty {
+            if trimmed.isEmpty {
                 _ = try? await kc.delete(key: name)
             } else {
-                try? await kc.save(key: name, value: value)
+                try? await kc.save(key: name, value: trimmed)
             }
         }
     }

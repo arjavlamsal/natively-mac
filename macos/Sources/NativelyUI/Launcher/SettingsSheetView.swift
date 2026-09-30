@@ -252,7 +252,7 @@ public struct SettingsSheetView: View {
     private var aiProvidersSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             keyField(
-                label: "Anthropic Claude (Claude 3.5 Sonnet)",
+                label: "Anthropic Claude (Claude 3.7 Sonnet / 3.5 Sonnet)",
                 placeholder: "sk-ant-...",
                 value: $viewModel.anthropicKey,
                 keyName: "anthropic_api_key",
@@ -260,19 +260,19 @@ public struct SettingsSheetView: View {
             )
             
             keyField(
-                label: "OpenAI (GPT-4o)",
-                placeholder: "sk-proj-...",
-                value: $viewModel.openAIKey,
-                keyName: "openai_api_key",
-                icon: "bolt.fill"
-            )
-            
-            keyField(
-                label: "Google Gemini (Gemini 2.0 Flash / Pro)",
+                label: "Google Gemini (Gemini 3.8 Flash / 3.5 Flash Lite / 3.1 Pro)",
                 placeholder: "AIzaSy...",
                 value: $viewModel.geminiKey,
                 keyName: "gemini_api_key",
                 icon: "sparkles"
+            )
+            
+            keyField(
+                label: "OpenAI (GPT-4o / o3-mini)",
+                placeholder: "sk-proj-...",
+                value: $viewModel.openAIKey,
+                keyName: "openai_api_key",
+                icon: "bolt.fill"
             )
             
             keyField(
@@ -284,7 +284,7 @@ public struct SettingsSheetView: View {
             )
             
             keyField(
-                label: "DeepSeek (DeepSeek V3)",
+                label: "DeepSeek (DeepSeek V3 / R1)",
                 placeholder: "sk-...",
                 value: $viewModel.deepSeekKey,
                 keyName: "deepseek_api_key",
