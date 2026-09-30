@@ -9,6 +9,7 @@ import NativelyCore
 public struct OverlayContentView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     public var onCropTrigger: () -> Void = {}
+    public var onFullScreenCapture: () -> Void = {}
     public var onWindowDrag: (CGSize, Bool) -> Void = { _, _ in }
     
     @FocusState private var isInputFocused: Bool
@@ -16,10 +17,12 @@ public struct OverlayContentView: View {
     public init(
         viewModel: OverlayViewModel,
         onCropTrigger: @escaping () -> Void = {},
+        onFullScreenCapture: @escaping () -> Void = {},
         onWindowDrag: @escaping (CGSize, Bool) -> Void = { _, _ in }
     ) {
         self.viewModel = viewModel
         self.onCropTrigger = onCropTrigger
+        self.onFullScreenCapture = onFullScreenCapture
         self.onWindowDrag = onWindowDrag
     }
     
@@ -29,6 +32,7 @@ public struct OverlayContentView: View {
             TopPillBarView(
                 viewModel: viewModel,
                 onCropTrigger: onCropTrigger,
+                onFullScreenCapture: onFullScreenCapture,
                 onWindowDrag: onWindowDrag
             )
             
@@ -76,7 +80,8 @@ public struct OverlayContentView: View {
     
     @ViewBuilder
     private var contextChipsRow: some View {
-        if viewModel.attachedWebContext != nil || viewModel.attachedOCRSnippet != nil || viewModel.attachedImageBase64 != nil {
+        let hasScreen = viewModel.attachedImageBase64 != nil || viewModel.activeScreenContext != nil || viewModel.attachedOCRSnippet != nil
+        if viewModel.attachedWebContext != nil || hasScreen {
             HStack(spacing: 8) {
                 // Web Page Context Chip
                 if let web = viewModel.attachedWebContext {
@@ -108,31 +113,61 @@ public struct OverlayContentView: View {
                     )
                 }
                 
-                // Screen OCR Chip
-                if viewModel.attachedOCRSnippet != nil {
-                    HStack(spacing: 5) {
-                        Image(systemName: "doc.text.viewfinder")
-                            .font(.system(size: 10))
-                            .foregroundColor(NativelyTheme.warningAmber)
-                        Text("Screen OCR Attached")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white)
+                // Screen Screenshot & OCR Chip
+                if hasScreen {
+                    HStack(spacing: 6) {
+                        if let base64 = viewModel.attachedImageBase64 ?? viewModel.activeScreenContext?.base64DataUrl,
+                           let img = NSImage(base64Encoding: base64) {
+                            Image(nsImage: img)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 22, height: 22)
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .stroke(NativelyTheme.warningAmber.opacity(0.4), lineWidth: 0.5)
+                                )
+                        } else {
+                            Image(systemName: "camera.viewfinder")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(NativelyTheme.warningAmber)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("Screen Attached")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.white)
+                            
+                            if let ocr = viewModel.attachedOCRSnippet, !ocr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text("\(ocr.count) chars OCR")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(NativelyTheme.warningAmber.opacity(0.9))
+                                    .lineLimit(1)
+                            } else {
+                                Text("Vision Ready")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        }
                         
                         Button(action: {
                             viewModel.clearScreenContext()
                         }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.7))
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white.opacity(0.75))
+                                .padding(3)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.leading, 4)
+                    .padding(.trailing, 8)
+                    .padding(.vertical, 3.5)
                     .background(NativelyTheme.warningAmber.opacity(0.18))
-                    .clipShape(Capsule())
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(
-                        Capsule()
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(NativelyTheme.warningAmber.opacity(0.35), lineWidth: 0.5)
                     )
                 }
@@ -224,23 +259,29 @@ public struct OverlayContentView: View {
     // MARK: - Bottom Toolbar
     
     private var bottomToolbar: some View {
-        VStack(spacing: 8) {
+        let hasScreen = viewModel.attachedImageBase64 != nil || viewModel.activeScreenContext != nil
+        let canSubmit = !viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasScreen
+        
+        return VStack(spacing: 8) {
             // Text Input Field Box
             HStack(spacing: 8) {
-                TextField("Ask anything on screen or conversation (↵ to send)...", text: $viewModel.quickPromptText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12.5))
-                    .foregroundColor(.white)
-                    .focused($isInputFocused)
-                    .onSubmit {
-                        submitPrompt()
-                    }
+                TextField(
+                    hasScreen ? "Ask about screenshot (or ↵ to analyze)..." : "Ask anything on screen or conversation (↵ to send)...",
+                    text: $viewModel.quickPromptText
+                )
+                .textFieldStyle(.plain)
+                .font(.system(size: 12.5))
+                .foregroundColor(.white)
+                .focused($isInputFocused)
+                .onSubmit {
+                    submitPrompt()
+                }
                 
                 // Submit Button (Blue Arrow Circle)
                 Button(action: submitPrompt) {
                     ZStack {
                         Circle()
-                            .fill(viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.white.opacity(0.12) : NativelyTheme.skyAccent)
+                            .fill(canSubmit ? NativelyTheme.skyAccent : Color.white.opacity(0.12))
                             .frame(width: 26, height: 26)
                         
                         Image(systemName: "arrow.up")
@@ -249,7 +290,7 @@ public struct OverlayContentView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(!canSubmit)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
@@ -339,13 +380,14 @@ public struct OverlayContentView: View {
                 
                 // 3a. Full Screen Capture Button (⌘⇧H)
                 Button(action: {
+                    onFullScreenCapture()
                     viewModel.onFullScreenCapture?()
                 }) {
                     Image(systemName: "camera")
                         .font(.system(size: 12))
-                        .foregroundColor(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber : .white.opacity(0.8))
+                        .foregroundColor(hasScreen ? NativelyTheme.warningAmber : .white.opacity(0.8))
                         .padding(6)
-                        .background(Color.white.opacity(0.07))
+                        .background(hasScreen ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.07))
                         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -358,9 +400,9 @@ public struct OverlayContentView: View {
                 }) {
                     Image(systemName: "crop")
                         .font(.system(size: 12))
-                        .foregroundColor(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber : .white.opacity(0.8))
+                        .foregroundColor(hasScreen ? NativelyTheme.warningAmber : .white.opacity(0.8))
                         .padding(6)
-                        .background(viewModel.attachedOCRSnippet != nil ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.07))
+                        .background(hasScreen ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.07))
                         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -404,9 +446,14 @@ public struct OverlayContentView: View {
     }
     
     private func submitPrompt() {
-        let text = viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var text = viewModel.quickPromptText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasScreen = viewModel.attachedImageBase64 != nil || viewModel.activeScreenContext != nil
+        if text.isEmpty && hasScreen {
+            text = "Analyze this screenshot and explain what is shown or what to answer."
+        }
         guard !text.isEmpty else { return }
         viewModel.quickPromptText = ""
         viewModel.askAI(prompt: text)
     }
 }
+

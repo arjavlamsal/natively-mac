@@ -277,16 +277,3 @@ private struct CopyAnswerButton: View {
         .help("Copy full answer")
     }
 }
-
-private extension NSImage {
-    convenience init?(base64Encoding: String) {
-        let cleanBase64: String
-        if let commaIndex = base64Encoding.firstIndex(of: ",") {
-            cleanBase64 = String(base64Encoding[base64Encoding.index(after: commaIndex)...])
-        } else {
-            cleanBase64 = base64Encoding
-        }
-        guard let data = Data(base64Encoded: cleanBase64.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
-        self.init(data: data)
-    }
-}

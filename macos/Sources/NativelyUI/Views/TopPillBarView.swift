@@ -7,15 +7,18 @@ import NativelyCore
 public struct TopPillBarView: View {
     @ObservedObject public var viewModel: OverlayViewModel
     public var onCropTrigger: () -> Void = {}
+    public var onFullScreenCapture: () -> Void = {}
     public var onWindowDrag: (CGSize, Bool) -> Void = { _, _ in }
     
     public init(
         viewModel: OverlayViewModel,
         onCropTrigger: @escaping () -> Void = {},
+        onFullScreenCapture: @escaping () -> Void = {},
         onWindowDrag: @escaping (CGSize, Bool) -> Void = { _, _ in }
     ) {
         self.viewModel = viewModel
         self.onCropTrigger = onCropTrigger
+        self.onFullScreenCapture = onFullScreenCapture
         self.onWindowDrag = onWindowDrag
     }
     
@@ -128,6 +131,21 @@ public struct TopPillBarView: View {
             .background(NativelyTheme.emeraldGreen.opacity(0.14))
             .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
             .help("Hardware Stealth: sharingType = .none (Completely invisible to Zoom, Teams, Meet)")
+            
+            // Quick Camera Screenshot Button
+            Button(action: {
+                onFullScreenCapture()
+                viewModel.onFullScreenCapture?()
+            }) {
+                Image(systemName: "camera")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor((viewModel.attachedImageBase64 != nil || viewModel.activeScreenContext != nil) ? NativelyTheme.warningAmber : .white.opacity(0.8))
+                    .padding(5)
+                    .background((viewModel.attachedImageBase64 != nil || viewModel.activeScreenContext != nil) ? NativelyTheme.warningAmber.opacity(0.2) : Color.white.opacity(0.08))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Capture Full Screen (⌘⇧H)")
             
             Spacer()
             

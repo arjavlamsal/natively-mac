@@ -92,6 +92,7 @@ public actor TurnPlannerActor {
         meetingId: String? = nil,
         modeId: String = "technical",
         screenContext: ScreenContext? = nil,
+        base64Image: String? = nil,
         customLadder: [FallbackRung]? = nil
     ) async throws -> FallbackResult {
         // 1. Fetch recent transcript context from the database if meetingId is provided
@@ -110,10 +111,12 @@ public actor TurnPlannerActor {
             screenContext: screenContext
         )
         
-        // 3. Append latest user question
+        // 3. Append latest user question with screenshot vision payload
         var userBase64Images: [String]? = nil
-        if let screen = screenContext {
+        if let screen = screenContext, !screen.base64DataUrl.isEmpty {
             userBase64Images = [screen.base64DataUrl]
+        } else if let base64 = base64Image, !base64.isEmpty {
+            userBase64Images = [base64]
         }
         let userMessage = AIMessage(role: .user, content: question, base64Images: userBase64Images)
         conversationHistory.append(userMessage)

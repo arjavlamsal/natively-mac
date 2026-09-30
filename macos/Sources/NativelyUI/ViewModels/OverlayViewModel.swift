@@ -276,13 +276,24 @@ public final class OverlayViewModel: ObservableObject {
         ttftLatencyMs = nil
         isExpanded = true
         
+        let meetingId = currentMeetingId ?? "standalone-\(UUID().uuidString)"
+        self.currentMeetingId = meetingId
+        let mode = activeMode
+        let planner = turnPlanner
+        let ocrContext = attachedOCRSnippet
+        let screenContextToUse = activeScreenContext
+        let imageBase64ToUse = attachedImageBase64 ?? activeScreenContext?.base64DataUrl
+        
+        // Reset attached screen chip for subsequent questions
+        self.clearScreenContext()
+        
         // Add user question bubble
         let userMessage = OverlayMessage(
             role: .user,
             text: prompt,
             isQuickActionLabel: isQuickAction,
             actionKind: actionKind,
-            screenshotPreview: attachedImageBase64
+            screenshotPreview: imageBase64ToUse
         )
         messages.append(userMessage)
         
@@ -298,16 +309,6 @@ public final class OverlayViewModel: ObservableObject {
         )
         messages.append(assistantMessage)
         
-        let meetingId = currentMeetingId ?? "standalone-\(UUID().uuidString)"
-        self.currentMeetingId = meetingId
-        let mode = activeMode
-        let planner = turnPlanner
-        let ocrContext = attachedOCRSnippet
-        let screenContextToUse = activeScreenContext
-        
-        // Reset attached screen chip for subsequent questions
-        self.clearScreenContext()
-        
         streamingTask = Task { [weak self] in
             let startTime = DispatchTime.now()
             var firstTokenRecorded = false
@@ -315,8 +316,8 @@ public final class OverlayViewModel: ObservableObject {
             if let planner {
                 do {
                     let fullPrompt: String
-                    if let ocr = ocrContext, !ocr.isEmpty {
-                        fullPrompt = "\(prompt)\n\n[Screen Context]:\n\(ocr)"
+                    if let ocr = ocrContext, !ocr.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        fullPrompt = "\(prompt)\n\n[Extracted Screen OCR]:\n\(ocr)"
                     } else {
                         fullPrompt = prompt
                     }
@@ -348,6 +349,7 @@ public final class OverlayViewModel: ObservableObject {
                         meetingId: meetingId,
                         modeId: mode.id,
                         screenContext: screenContextToUse,
+                        base64Image: imageBase64ToUse,
                         customLadder: dynamicLadder
                     )
                     

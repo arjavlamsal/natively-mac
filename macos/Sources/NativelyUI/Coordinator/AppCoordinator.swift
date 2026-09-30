@@ -69,6 +69,9 @@ public final class AppCoordinator: ObservableObject {
         overlayWindowManager.viewModel.onCropTrigger = { [weak self] in
             self?.overlayWindowManager.handleCropTrigger()
         }
+        overlayWindowManager.viewModel.onFullScreenCapture = { [weak self] in
+            self?.overlayWindowManager.handleFullScreenCapture()
+        }
         
         // Wire Launcher Dashboard Meeting Actions
         launcherWindowManager.viewModel.onStartMeeting = { [weak self] in

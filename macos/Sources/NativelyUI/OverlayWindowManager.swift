@@ -55,10 +55,20 @@ public final class OverlayWindowManager: ObservableObject {
         let passthroughContainer = HitTestPassthroughView(frame: NSRect(origin: .zero, size: contentRect.size))
         passthroughContainer.autoresizingMask = [.width, .height]
         
+        viewModel.onCropTrigger = { [weak self] in
+            self?.handleCropTrigger()
+        }
+        viewModel.onFullScreenCapture = { [weak self] in
+            self?.handleFullScreenCapture()
+        }
+        
         let contentView = OverlayContentView(
             viewModel: viewModel,
             onCropTrigger: { [weak self] in
                 self?.handleCropTrigger()
+            },
+            onFullScreenCapture: { [weak self] in
+                self?.handleFullScreenCapture()
             },
             onWindowDrag: { [weak self] translation, isEnded in
                 self?.handleWindowDrag(translation, isEnded: isEnded)
@@ -118,12 +128,15 @@ public final class OverlayWindowManager: ObservableObject {
     /// Triggers the interactive cropper and sends OCR output to the active context.
     public func handleCropTrigger() {
         Task { [weak self] in
-            guard let self, let vision = self.screenVisionCoordinator else {
+            guard let self else { return }
+            guard let vision = self.screenVisionCoordinator else {
                 // If vision coordinator not injected, set mock OCR for preview/testing
-                self?.viewModel.attachScreenContext(
+                self.viewModel.attachScreenContext(
                     ocrText: "Example OCR: Given an array of integers nums, return indices of the two numbers such that they add up to target.",
                     imageBase64: nil
                 )
+                self.viewModel.isExpanded = true
+                self.viewModel.isFocusingPrompt = true
                 return
             }
             
@@ -134,6 +147,9 @@ public final class OverlayWindowManager: ObservableObject {
                         imageBase64: cropResult.base64DataUrl,
                         screenContext: cropResult
                     )
+                    self.viewModel.isExpanded = true
+                    self.viewModel.isFocusingPrompt = true
+                    self.panel?.orderFront(nil)
                 }
             } catch {
                 self.viewModel.appendAssistantMessage(
@@ -146,7 +162,8 @@ public final class OverlayWindowManager: ObservableObject {
     /// Captures the full active display and attaches OCR + vision context.
     public func handleFullScreenCapture() {
         Task { [weak self] in
-            guard let self, let vision = self.screenVisionCoordinator else { return }
+            guard let self else { return }
+            guard let vision = self.screenVisionCoordinator else { return }
             do {
                 if let result = try await vision.captureAndAnalyze(region: .mainDisplay) {
                     self.viewModel.attachScreenContext(
@@ -154,6 +171,9 @@ public final class OverlayWindowManager: ObservableObject {
                         imageBase64: result.base64DataUrl,
                         screenContext: result
                     )
+                    self.viewModel.isExpanded = true
+                    self.viewModel.isFocusingPrompt = true
+                    self.panel?.orderFront(nil)
                 }
             } catch {
                 self.viewModel.appendAssistantMessage(

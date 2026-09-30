@@ -321,4 +321,64 @@ struct AIPipelineTests {
             #expect(prompt.contains("You are Natively"))
         }
     }
+    
+    @Test("TurnPlannerActor attaches screenshot base64 images and generates answer")
+    func testTurnPlannerScreenshotAttachment() async throws {
+        let db = try AppDatabase.makeInMemory()
+        let meetingId = "meeting-vision-test"
+        try db.saveMeeting(Meeting(id: meetingId, title: "Vision Test Meeting"))
+        
+        let dummyImage = CGContext(
+            data: nil,
+            width: 10,
+            height: 10,
+            bitsPerComponent: 8,
+            bytesPerRow: 40,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )!.makeImage()!
+        
+        let screen = ScreenContext(
+            cgImage: dummyImage,
+            pngData: Data([0x89, 0x50, 0x4E, 0x47]),
+            base64DataUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==",
+            ocrResult: OCRResult(fullText: "LeetCode 1: Two Sum"),
+            bounds: .zero,
+            imageHash: "hash123"
+        )
+        
+        let mockProvider = MockStreamingProvider(
+            providerType: .googleGemini,
+            chunks: ["The optimal solution is to use a Hash Map in $O(N)$ time."]
+        )
+        let customClients: [AIProviderType: StreamingAIProvider] = [
+            .googleGemini: mockProvider
+        ]
+        
+        let testKeychain = KeychainManager(service: "test.planner.vision.\(UUID().uuidString)")
+        try await testKeychain.save(key: "gemini_api_key", value: "mock-gemini-key")
+        
+        let planner = TurnPlannerActor(
+            database: db,
+            keychain: testKeychain,
+            customClients: customClients
+        )
+        
+        let ladder = [FallbackRung(providerType: .googleGemini, model: "gemini-3.5-flash-lite")]
+        let result = try await planner.generateAnswer(
+            question: "How do I solve this?",
+            meetingId: meetingId,
+            modeId: "technical",
+            screenContext: screen,
+            base64Image: screen.base64DataUrl,
+            customLadder: ladder
+        )
+        
+        var answer = ""
+        for try await chunk in result.stream {
+            answer += chunk
+        }
+        #expect(answer.contains("Hash Map"))
+        #expect(result.providerUsed == AIProviderType.googleGemini)
+    }
 }
