@@ -30,7 +30,7 @@ public struct AppSettings: Codable, Sendable, Equatable {
     public var primarySystemAudioId: String?
 
     public init(
-        selectedSTTEngine: STTEngineType = .whisperKit,
+        selectedSTTEngine: STTEngineType = .appleSpeech,
         selectedAIProvider: AIProviderType = .anthropic,
         selectedModel: String = "claude-3-5-sonnet-20241022",
         activeModeId: String = "tech-interview",

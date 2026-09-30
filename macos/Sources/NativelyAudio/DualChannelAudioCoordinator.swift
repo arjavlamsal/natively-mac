@@ -12,7 +12,7 @@ public actor DualChannelAudioCoordinator {
     private let transcriptionService: WhisperTranscriptionService
     private let appleSpeechService: AppleSpeechTranscriptionService
     private let database: AppDatabase
-    private var sttEngine: STTEngineType = .whisperKit
+    private var sttEngine: STTEngineType = .appleSpeech
 
     private var activeMeetingId: String?
     private var isRecording = false
@@ -33,7 +33,7 @@ public actor DualChannelAudioCoordinator {
         vad: VoiceActivityDetector = VoiceActivityDetector(),
         transcriptionService: WhisperTranscriptionService = WhisperTranscriptionService(),
         appleSpeechService: AppleSpeechTranscriptionService = AppleSpeechTranscriptionService(),
-        sttEngine: STTEngineType = .whisperKit
+        sttEngine: STTEngineType = .appleSpeech
     ) {
         self.database = database
         self.micService = micService
@@ -93,14 +93,12 @@ public actor DualChannelAudioCoordinator {
 
     public func stopMeeting() async {
         guard isRecording else { return }
+        self.isRecording = false
         micService.stop()
         await systemAudioService.stop()
 
-        // Flush remaining buffered audio
-        await flushChannel(.microphone)
-        await flushChannel(.systemLoopback)
-
-        self.isRecording = false
+        self.micBuffer.removeAll()
+        self.systemBuffer.removeAll()
         self.activeMeetingId = nil
     }
 
@@ -132,6 +130,7 @@ public actor DualChannelAudioCoordinator {
     }
 
     private func flushChannel(_ channel: AudioChannel) async {
+        guard isRecording else { return }
         let samples: [Float]
         let startTimeMs: Int64
         let speaker: String
@@ -154,15 +153,21 @@ public actor DualChannelAudioCoordinator {
 
         // Voice Activity Gate: ignore silence frames
         guard vad.containsVoice(samples: samples) else { return }
-        guard let meetingId = self.activeMeetingId else { return }
+        guard isRecording, let meetingId = self.activeMeetingId else { return }
 
         do {
             let segments: [WhisperSegment]
             if sttEngine == .appleSpeech {
                 segments = try await appleSpeechService.transcribe(audioSamples: samples)
             } else {
-                segments = try await transcriptionService.transcribe(audioSamples: samples)
+                do {
+                    segments = try await transcriptionService.transcribe(audioSamples: samples)
+                } catch {
+                    // Fall back cleanly to macOS Speech.framework if WhisperKit fails to load or run
+                    segments = try await appleSpeechService.transcribe(audioSamples: samples)
+                }
             }
+            guard isRecording else { return }
             for segment in segments {
                 let turn = TranscriptTurn(
                     meetingId: meetingId,

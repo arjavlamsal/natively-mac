@@ -19,6 +19,8 @@ public struct WhisperSegment: Sendable, Equatable {
     }
 }
 
+import CoreML
+
 public actor WhisperTranscriptionService {
     public enum ModelVariant: String, Sendable, CaseIterable {
         case tiny = "openai_whisper-tiny"
@@ -36,7 +38,21 @@ public actor WhisperTranscriptionService {
 
     public func initialize() async throws {
         guard !isInitialized else { return }
-        let pipe = try await WhisperKit(model: modelVariant.rawValue)
+        // CoreML on Apple Silicon M4 / macOS Sequoia/27 crashes with SIGSEGV in
+        // MLE5ProgramLibraryOnDeviceAOTCompilationImpl when using Neural Engine (.all or .cpuAndNeuralEngine).
+        // By explicitly forcing .cpuAndGPU, CoreML uses Metal GPU compute instead of MLE5 ANE AOT compilation,
+        // which avoids the crash and runs extremely fast on Apple Silicon GPUs.
+        let computeOptions = ModelComputeOptions(
+            melCompute: .cpuAndGPU,
+            audioEncoderCompute: .cpuAndGPU,
+            textDecoderCompute: .cpuAndGPU,
+            prefillCompute: .cpuAndGPU
+        )
+        let pipe = try await WhisperKit(
+            model: modelVariant.rawValue,
+            computeOptions: computeOptions,
+            download: true
+        )
         self.whisperKit = pipe
         self.isInitialized = true
     }

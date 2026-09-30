@@ -59,7 +59,7 @@ struct MeetingTests {
     @Test("AppSettings default values")
     func testAppSettings() {
         let settings = AppSettings()
-        #expect(settings.selectedSTTEngine == .whisperKit)
+        #expect(settings.selectedSTTEngine == .appleSpeech)
         #expect(settings.isStealthModeEnabled == true)
         #expect(settings.isAdaptiveDockEnabled == true)
         #expect(settings.selectedAIProvider == .anthropic)
